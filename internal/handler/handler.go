@@ -34,11 +34,11 @@ func (rtr *Router) Route(path *regexp.Regexp, method, contentType string, handle
 
 func (re *RouteEntry) Match(r *http.Request) bool {
 	if r.Method != re.Method {
-		return false // Method mismatch
+		return false
 	}
 
 	if r.Header.Get("content-type") != re.ContentType {
-		return false // Method mismatch
+		return false
 	}
 
 	return re.Path.MatchString(r.URL.Path)
@@ -78,7 +78,6 @@ func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 	resp := "http://" + r.Host + "/" + shortLink
 
 	w.Header().Set("content-type", "text/plain")
-	// w.Header().Set("content-length", fmt.Sprintf("%d", len(resp)))
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(resp))
 }

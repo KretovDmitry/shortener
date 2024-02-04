@@ -1,4 +1,4 @@
-// Package shorturl manages the conversion of the original URL to a short one and vice versa.
+// Package shorturl manages the conversion of the original URL to a short one.
 package shorturl
 
 import (

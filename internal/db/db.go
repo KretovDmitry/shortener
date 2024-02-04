@@ -27,20 +27,20 @@ func (memo *memo) get(key string) (url string, found bool) {
 func (memo *memo) set(url string) (string, error) {
 	memo.mu.Lock()
 	defer memo.mu.Unlock()
-	shortUrl, err := shorturl.GenerateShortLink(url)
+	shortURL, err := shorturl.GenerateShortLink(url)
 	if err != nil {
 		return "", err
 	}
-	memo.cache[shortUrl] = url
-	return shortUrl, nil
+	memo.cache[shortURL] = url
+	return shortURL, nil
 }
 
 var m storage = &memo{cache: make(map[string]string)}
 
-func RetrieveInitialUrl(shortUrl string) (ulr string, found bool) {
-	return m.get(shortUrl)
+func RetrieveInitialURL(shortURL string) (ulr string, found bool) {
+	return m.get(shortURL)
 }
 
-func SaveUrlMapping(url string) (string, error) {
+func SaveURLMapping(url string) (string, error) {
 	return m.set(url)
 }

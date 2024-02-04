@@ -7,22 +7,23 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"slices"
 
 	"github.com/KretovDmitry/shortener/internal/db"
 )
-
-type RouteEntry struct {
-	Path        *regexp.Regexp
-	Method      string
-	ContentType string
-	Handler     http.HandlerFunc
-}
 
 type Router struct {
 	routes []RouteEntry
 }
 
-func (rtr *Router) Route(path *regexp.Regexp, method, contentType string, handlerFunc http.HandlerFunc) {
+type RouteEntry struct {
+	Path        *regexp.Regexp
+	Method      string
+	ContentType *[]string
+	Handler     http.HandlerFunc
+}
+
+func (rtr *Router) Route(path *regexp.Regexp, method string, contentType *[]string, handlerFunc http.HandlerFunc) {
 	e := RouteEntry{
 		Path:        path,
 		Method:      method,
@@ -37,8 +38,8 @@ func (re *RouteEntry) Match(r *http.Request) bool {
 		return false
 	}
 
-	if r.Header.Get("content-type") != re.ContentType {
-		return false
+	if slices.Contains(*re.ContentType, r.Header.Get("content-type")) {
+		return true
 	}
 
 	return re.Path.MatchString(r.URL.Path)
@@ -46,11 +47,9 @@ func (re *RouteEntry) Match(r *http.Request) bool {
 
 func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, e := range rtr.routes {
-		match := e.Match(r)
-		if !match {
+		if !e.Match(r) {
 			continue
 		}
-
 		e.Handler.ServeHTTP(w, r)
 		return
 	}
@@ -61,7 +60,7 @@ func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 var HomeRegexp = regexp.MustCompile(`^\/$`)
 
-func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
+func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("could't read body: %s\n", err)
@@ -69,7 +68,7 @@ func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortLink, err := db.SaveUrlMapping(string(body))
+	shortLink, err := db.SaveURLMapping(string(body))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -84,8 +83,8 @@ func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 
 var Base58Regexp = regexp.MustCompile(`^\/[A-HJ-NP-Za-km-z1-9]{8}$`)
 
-func HandleShortUrlRedirecth(w http.ResponseWriter, r *http.Request) {
-	url, found := db.RetrieveInitialUrl(r.URL.Path[1:])
+func HandleShortURLRedirect(w http.ResponseWriter, r *http.Request) {
+	url, found := db.RetrieveInitialURL(r.URL.Path[1:])
 	if !found {
 		msg := fmt.Sprintf("no such short URL: %s\n", r.URL.Path[1:])
 		http.Error(w, msg, http.StatusBadRequest)

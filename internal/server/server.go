@@ -42,9 +42,11 @@ func Run(ip string, port int) error {
 		return errors.Wrap(&notValidIPError{ip: ip}, "server failed")
 	}
 
+	validContentType := &[]string{"text/plain", "text/plain; charset=utf-8"}
+
 	router := &handler.Router{}
-	router.Route(handler.HomeRegexp, http.MethodPost, "text/plain", handler.CreateShortUrl)
-	router.Route(handler.Base58Regexp, http.MethodGet, "text/plain", handler.HandleShortUrlRedirecth)
+	router.Route(handler.HomeRegexp, http.MethodPost, validContentType, handler.CreateShortURL)
+	router.Route(handler.Base58Regexp, http.MethodGet, validContentType, handler.HandleShortURLRedirect)
 
 	addr := fmt.Sprintf("%s:%d", validIP, port)
 

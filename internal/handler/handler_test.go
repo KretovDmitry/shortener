@@ -127,6 +127,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			HandleShortURLRedirect(recorder, request)
 
 			response := recorder.Result()
+			defer response.Body.Close()
 
 			assert.Equal(t, tt.want.statusCode, response.StatusCode)
 			assert.Equal(t, tt.want.originalURL, response.Header.Get("location"))

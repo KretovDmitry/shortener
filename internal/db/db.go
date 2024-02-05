@@ -1,46 +1,64 @@
-// Package db is responsible for storing short URLs.
+// Package db is responsible for storing original and short URLs.
 package db
 
 import (
 	"sync"
-
-	"github.com/KretovDmitry/shortener/internal/shorturl"
 )
 
-type storage interface {
-	get(key string) (url string, found bool)
-	set(url string) (string, error)
-}
-
-type memo struct {
+type DB struct {
 	mu    sync.RWMutex
-	cache map[string]string
+	store map[string]string
 }
 
-func (memo *memo) get(key string) (url string, found bool) {
-	memo.mu.RLock()
-	defer memo.mu.RUnlock()
-	url, found = memo.cache[key]
+func (db *DB) get(key string) (url string, found bool) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	url, found = db.store[key]
 	return
 }
 
-func (memo *memo) set(url string) (string, error) {
-	memo.mu.Lock()
-	defer memo.mu.Unlock()
-	shortURL, err := shorturl.GenerateShortLink(url)
-	if err != nil {
-		return "", err
+func (db *DB) set(shortURL, url string) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.store[shortURL] = url
+}
+
+// Since I do not know any architectural patterns,
+// the main reason I created the next function
+// is to be able to provide some mock data for testing
+
+// Init allows to set some initial data
+// NOTE: since it is exported, it can be used anywhere in the code
+// to fill the storage with garbage data :(
+func (db *DB) Init(data map[string]string) *DB {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	for k, v := range data {
+		db.store[k] = v
 	}
-	memo.cache[shortURL] = url
-	return shortURL, nil
+	return db
 }
 
-var m storage = &memo{cache: make(map[string]string)}
+// global storage
+var db *DB
 
+// GetDB returns global storage
+func GetDB() *DB {
+	if db != nil {
+		return db
+	}
+
+	db = &DB{store: make(map[string]string)}
+
+	return db
+}
+
+// Returns the original URL address, the key is its shortened version
 func RetrieveInitialURL(shortURL string) (ulr string, found bool) {
-	return m.get(shortURL)
+	return GetDB().get(shortURL)
 }
 
-func SaveURLMapping(url string) (string, error) {
-	return m.set(url)
+// Saves both original and short URL to the database
+func SaveURLMapping(shortURL, url string) {
+	GetDB().set(shortURL, url)
 }

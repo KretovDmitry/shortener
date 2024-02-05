@@ -7,74 +7,31 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"slices"
 
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/shorturl"
 )
-
-type Router struct {
-	routes []RouteEntry
-}
-
-type RouteEntry struct {
-	Path        *regexp.Regexp
-	Method      string
-	ContentType *[]string
-	Handler     http.HandlerFunc
-}
-
-func (rtr *Router) Route(path *regexp.Regexp, method string, contentType *[]string, handlerFunc http.HandlerFunc) {
-	e := RouteEntry{
-		Path:        path,
-		Method:      method,
-		ContentType: contentType,
-		Handler:     handlerFunc,
-	}
-	rtr.routes = append(rtr.routes, e)
-}
-
-func (re *RouteEntry) Match(r *http.Request) bool {
-	if r.Method != re.Method {
-		return false
-	}
-
-	if slices.Contains(*re.ContentType, r.Header.Get("content-type")) {
-		return true
-	}
-
-	return re.Path.MatchString(r.URL.Path)
-}
-
-func (rtr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	for _, e := range rtr.routes {
-		if !e.Match(r) {
-			continue
-		}
-		e.Handler.ServeHTTP(w, r)
-		return
-	}
-
-	// No matches, so it's a 400
-	http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-}
 
 var HomeRegexp = regexp.MustCompile(`^\/$`)
 
 func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("could't read body: %s\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("create short URL failed to read body: %s\n", err)
+		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 		return
 	}
 
-	shortLink, err := db.SaveURLMapping(string(body))
+	originalURL := string(body)
+	shortURL, err := shorturl.GenerateShortLink(originalURL)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		log.Printf("create short URL: %s\n", err)
+		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 	}
 
-	resp := "http://" + r.Host + "/" + shortLink
+	db.SaveURLMapping(shortURL, originalURL)
+
+	resp := "http://" + r.Host + "/" + shortURL
 
 	w.Header().Set("content-type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
@@ -84,9 +41,14 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 var Base58Regexp = regexp.MustCompile(`^\/[A-HJ-NP-Za-km-z1-9]{8}$`)
 
 func HandleShortURLRedirect(w http.ResponseWriter, r *http.Request) {
+	if !Base58Regexp.MatchString(r.URL.Path) {
+		msg := fmt.Sprintf("Specified URL does not meet the requirements of the service: %s\n", r.URL.Path[1:])
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
 	url, found := db.RetrieveInitialURL(r.URL.Path[1:])
 	if !found {
-		msg := fmt.Sprintf("no such short URL: %s\n", r.URL.Path[1:])
+		msg := fmt.Sprintf("No such short URL: %s\n", r.URL.Path[1:])
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}

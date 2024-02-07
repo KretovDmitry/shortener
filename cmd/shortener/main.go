@@ -6,7 +6,8 @@ import (
 	"os"
 
 	"github.com/KretovDmitry/shortener/internal/handler"
-	"github.com/KretovDmitry/shortener/internal/router"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -15,15 +16,15 @@ const (
 )
 
 func main() {
-	validContentType := &[]string{"text/plain", "text/plain; charset=utf-8"}
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
 
-	router := &router.Router{}
-	router.Route(handler.HomeRegexp, http.MethodPost, validContentType, handler.CreateShortURL)
-	router.Route(handler.Base58Regexp, http.MethodGet, validContentType, handler.HandleShortURLRedirect)
+	r.Post("/", handler.CreateShortURL)
+	r.Get("/{shortURL}", handler.HandleShortURLRedirect)
 
 	addr := fmt.Sprintf("%s:%d", _defaultHost, _defaultPort)
 
-	if err := http.ListenAndServe(addr, router); err != nil {
+	if err := http.ListenAndServe(addr, r); err != nil {
 		fmt.Fprintf(os.Stderr, "%+v\n", err)
 		os.Exit(1)
 	}

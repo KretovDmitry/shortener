@@ -7,14 +7,24 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
+	"github.com/go-chi/chi/v5"
 )
 
-var HomeRegexp = regexp.MustCompile(`^\/$`)
-
 func CreateShortURL(w http.ResponseWriter, r *http.Request) {
+	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
+	if i := strings.Index(contentType, ";"); i > -1 {
+		contentType = contentType[0:i]
+	}
+	if contentType != "text/plain" {
+		msg := `Only "text/plain" Content-Type is allowed`
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("create short URL failed to read body: %s\n", err)
@@ -22,37 +32,44 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(body) == 0 {
+		http.Error(w, "Empty body, must contain URL", http.StatusBadRequest)
+		return
+	}
+
 	originalURL := string(body)
+
 	shortURL, err := shorturl.GenerateShortLink(originalURL)
 	if err != nil {
 		log.Printf("create short URL: %s\n", err)
 		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 	}
 
-	db.SaveURLMapping(shortURL, originalURL)
+	db.SaveURL(shortURL, originalURL)
 
-	resp := "http://" + r.Host + "/" + shortURL
-
-	w.Header().Set("content-type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(resp))
+	w.Write([]byte(fmt.Sprintf("http://%s/%s", r.Host, shortURL)))
 }
 
-var Base58Regexp = regexp.MustCompile(`^\/[A-HJ-NP-Za-km-z1-9]{8}$`)
+var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]{8}$`)
 
 func HandleShortURLRedirect(w http.ResponseWriter, r *http.Request) {
-	if !Base58Regexp.MatchString(r.URL.Path) {
-		msg := fmt.Sprintf("Specified URL does not meet the requirements of the service: %s\n", r.URL.Path[1:])
-		http.Error(w, msg, http.StatusBadRequest)
-		return
-	}
-	url, found := db.RetrieveInitialURL(r.URL.Path[1:])
-	if !found {
-		msg := fmt.Sprintf("No such short URL: %s\n", r.URL.Path[1:])
-		http.Error(w, msg, http.StatusBadRequest)
+	shortURL := chi.URLParam(r, "shortURL")
+
+	if !Base58Regexp.MatchString(shortURL) {
+		http.Error(w, "Invalid URL: "+shortURL, http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("location", url)
+	url, found := db.RetrieveInitialURL(shortURL)
+
+	if !found {
+		http.Error(w, "No such URL: "+shortURL, http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }

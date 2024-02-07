@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/cfg"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/go-chi/chi/v5"
@@ -49,7 +50,8 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf("http://%s/%s", r.Host, shortURL)))
+	fmt.Println(cfg.AddrToReturn)
+	w.Write([]byte(fmt.Sprintf("http://%s/%s", cfg.AddrToReturn, shortURL)))
 }
 
 var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]{8}$`)

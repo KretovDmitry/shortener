@@ -3,29 +3,29 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 
+	"github.com/KretovDmitry/shortener/internal/cfg"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-const (
-	_defaultHost = "0.0.0.0"
-	_defaultPort = 8080
-)
-
 func main() {
+	if err := run(); err != nil {
+		panic(err)
+	}
+}
+
+func run() error {
+	cfg.ParseFlags()
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
 	r.Post("/", handler.CreateShortURL)
 	r.Get("/{shortURL}", handler.HandleShortURLRedirect)
 
-	addr := fmt.Sprintf("%s:%d", _defaultHost, _defaultPort)
-
-	if err := http.ListenAndServe(addr, r); err != nil {
-		fmt.Fprintf(os.Stderr, "%+v\n", err)
-		os.Exit(1)
-	}
+	fmt.Println(cfg.AddrToReturn)
+	fmt.Println("Running server on", cfg.AddrToRun)
+	return http.ListenAndServe(cfg.AddrToRun.String(), r)
 }

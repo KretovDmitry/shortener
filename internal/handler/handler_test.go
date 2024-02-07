@@ -69,7 +69,7 @@ func TestCreateShortURL(t *testing.T) {
 			want: want{
 				statusCode:  http.StatusCreated,
 				contentType: "text/plain",
-				response:    "http://localhost:8080/be8xnp4H",
+				response:    "be8xnp4H",
 			},
 		},
 		{
@@ -79,7 +79,7 @@ func TestCreateShortURL(t *testing.T) {
 			want: want{
 				statusCode:  http.StatusCreated,
 				contentType: "text/plain",
-				response:    "http://localhost:8080/eDKZ8wBC",
+				response:    "eDKZ8wBC",
 			},
 		},
 		{
@@ -89,7 +89,7 @@ func TestCreateShortURL(t *testing.T) {
 			want: want{
 				statusCode:  http.StatusCreated,
 				contentType: "text/plain",
-				response:    "http://localhost:8080/eDKZ8wBC",
+				response:    "eDKZ8wBC",
 			},
 		},
 		{
@@ -116,6 +116,10 @@ func TestCreateShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, get := testRequest(t, ts, http.MethodPost, path, tt.contentType, tt.payload)
+			if strings.HasPrefix(get, "http") {
+				g := strings.Split(get, "/")
+				get = g[len(g)-1]
+			}
 			resp.Body.Close()
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))

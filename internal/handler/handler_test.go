@@ -116,6 +116,7 @@ func TestCreateShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, get := testRequest(t, ts, http.MethodPost, path, tt.contentType, tt.payload)
+			resp.Body.Close()
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))
 			assert.Equal(t, tt.want.response, strings.TrimSpace(get))
@@ -203,9 +204,12 @@ func TestHandleShortURLRedirect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.createMock {
-				_, _ = testRequest(t, tsToCreate, http.MethodPost, "/", contentType, tt.want.response)
+				resp, _ := testRequest(t, tsToCreate, http.MethodPost, "/", contentType, tt.want.response)
+				resp.Body.Close()
 			}
 			resp, get := testRequest(t, tsToRetrieve, http.MethodGet, tt.path, contentType, "")
+			resp.Body.Close()
+
 			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
 
 			if resp.StatusCode != http.StatusBadRequest {

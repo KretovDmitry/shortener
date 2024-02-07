@@ -22,6 +22,7 @@ func (a netAddress) String() string {
 }
 
 func (a *netAddress) Set(s string) error {
+	s = strings.TrimPrefix(s, "http://")
 	hp := strings.Split(s, ":")
 	if len(hp) != 2 {
 		return errors.New("need address in a form host:port")

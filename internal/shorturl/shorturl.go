@@ -28,8 +28,8 @@ func base58Encoded(bytes []byte) (string, error) {
 	return string(encoded), nil
 }
 
-// GenerateShortLink generates a short link with a length of 8 characters from the original one
-func GenerateShortLink(initialLink string) (string, error) {
+// Generate produces a short link with a length of 8 characters from the original one
+func Generate(initialLink string) (string, error) {
 	urlHashBytes := sha256Of([]byte(initialLink))
 	generatedNumber := new(big.Int).SetBytes(urlHashBytes).Uint64()
 	finalString, err := base58Encoded([]byte(fmt.Sprintf("%d", generatedNumber)))

@@ -1,15 +1,18 @@
 package cfg
 
 import (
-	"errors"
+	goErrors "errors"
 	"flag"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
-	_defaultHost = "0.0.0.0"
-	_defaultPort = 8080
+	defaultHost = "0.0.0.0"
+	defaultPort = 8080
 )
 
 type netAddress struct {
@@ -25,7 +28,7 @@ func (a *netAddress) Set(s string) error {
 	s = strings.TrimPrefix(s, "http://")
 	hp := strings.Split(s, ":")
 	if len(hp) != 2 {
-		return errors.New("need address in a form host:port")
+		return goErrors.New("need address in a form host:port")
 	}
 	port, err := strconv.Atoi(hp[1])
 	if err != nil {
@@ -43,18 +46,38 @@ var (
 	AddrToReturn = new(netAddress)
 )
 
-func ParseFlags() {
-	// compile time flag.Value interface implementation check
+func ParseFlags() error {
+	// compile time flag.Value interface implementation verification
 	_ = flag.Value(AddrToRun)
 	_ = flag.Value(AddrToReturn)
 
-	AddrToRun.Host = _defaultHost
-	AddrToRun.Port = _defaultPort
+	// if neither ENV variables are specified
+	// nor CLI arguments are provided, use the default host and port
+	AddrToRun.Host = defaultHost
+	AddrToRun.Port = defaultPort
 
-	AddrToReturn.Host = _defaultHost
-	AddrToReturn.Port = _defaultPort
+	AddrToReturn.Host = defaultHost
+	AddrToReturn.Port = defaultPort
 
+	// flags take precedence over default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
 	flag.Parse()
+
+	// ENV variables have the highest priority
+	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
+		err := AddrToRun.Set(envRunAddr)
+		if err != nil {
+			return errors.Wrap(err, "invalid SERVER_ADDRESS")
+		}
+	}
+
+	if envReturnAddr := os.Getenv("BASE_URL"); envReturnAddr != "" {
+		err := AddrToReturn.Set(envReturnAddr)
+		if err != nil {
+			return errors.Wrap(err, "invalid BASE_URL")
+		}
+	}
+
+	return nil
 }

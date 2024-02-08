@@ -40,7 +40,7 @@ func CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	originalURL := string(body)
 
-	shortURL, err := shorturl.GenerateShortLink(originalURL)
+	shortURL, err := shorturl.Generate(originalURL)
 	if err != nil {
 		log.Printf("create short URL: %s\n", err)
 		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)

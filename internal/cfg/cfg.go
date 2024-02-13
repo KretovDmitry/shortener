@@ -20,6 +20,14 @@ type netAddress struct {
 	Port int
 }
 
+// NewNetAddress returns pointer to new netAddress with default Host and Port
+func NewNetAddress() *netAddress {
+	return &netAddress{
+		Host: defaultHost,
+		Port: defaultPort,
+	}
+}
+
 func (a netAddress) String() string {
 	return a.Host + ":" + strconv.Itoa(a.Port)
 }
@@ -42,22 +50,14 @@ func (a *netAddress) Set(s string) error {
 }
 
 var (
-	AddrToRun    = new(netAddress)
-	AddrToReturn = new(netAddress)
+	AddrToRun    = NewNetAddress()
+	AddrToReturn = NewNetAddress()
 )
 
 func ParseFlags() error {
 	// compile time flag.Value interface implementation verification
 	_ = flag.Value(AddrToRun)
 	_ = flag.Value(AddrToReturn)
-
-	// if neither ENV variables are specified
-	// nor CLI arguments are provided, use the default host and port
-	AddrToRun.Host = defaultHost
-	AddrToRun.Port = defaultPort
-
-	AddrToReturn.Host = defaultHost
-	AddrToReturn.Port = defaultPort
 
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")

@@ -68,7 +68,7 @@ func (ctx *handlerContext) CreateShortURL(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(fmt.Sprintf("http://%s/%s", cfg.AddrToReturn, shortURL)))
 }
@@ -84,12 +84,12 @@ func (ctx *handlerContext) HandleShortURLRedirect(w http.ResponseWriter, r *http
 	}
 
 	url, err := ctx.store.RetrieveInitialURL(shortURL)
-	if errors.Is(err, db.ErrNotFound) {
+	if errors.Is(err, db.ErrURLNotFound) {
 		http.Error(w, "No such URL: "+shortURL, http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }

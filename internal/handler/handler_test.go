@@ -2,60 +2,53 @@
 package handler
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func createShortURLRouter() chi.Router {
-	r := chi.NewRouter()
-
-	r.Post("/", CreateShortURL)
-	return r
+// mokeStore must implement db.Storage interface
+type mockStore struct {
+	expectedData string
 }
 
-func createHandleShortURLRedirectRouter() chi.Router {
-	r := chi.NewRouter()
-
-	r.Get("/{shortURL}", HandleShortURLRedirect)
-	return r
+// do nothing on create
+func (s *mockStore) SaveURL(shortURL, url string) error {
+	return nil
 }
 
-func testRequest(t *testing.T, ts *httptest.Server, method,
-	path, contentType, payload string) (*http.Response, string) {
-
-	req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(payload))
-	require.NoError(t, err)
-	req.Host = "localhost:8080"
-	req.Header.Set("Content-Type", contentType)
-
-	resp, err := ts.Client().Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	return resp, string(respBody)
+// return expected data
+func (s *mockStore) RetrieveInitialURL(shortURL string) (string, error) {
+	// mock not found error
+	if s.expectedData == "" {
+		return "", db.ErrURLNotFound
+	}
+	return s.expectedData, nil
 }
 
 func TestCreateShortURL(t *testing.T) {
-	ts := httptest.NewServer(createShortURLRouter())
-	defer ts.Close()
+	// we don't retrieve any data from the store
+	// handler returns newly created short URL
+	emptyMockStore := &mockStore{expectedData: ""}
+
+	// should always return "text/plain; charset=utf-8" content type
+	contentType := "text/plain; charset=utf-8"
 
 	path := "/"
 
 	type want struct {
-		statusCode  int
-		contentType string
-		response    string
+		statusCode int
+		response   string
 	}
+
 	tests := []struct {
 		name        string
 		contentType string
@@ -67,9 +60,8 @@ func TestCreateShortURL(t *testing.T) {
 			contentType: "text/plain",
 			payload:     "https://e.mail.ru/inbox/",
 			want: want{
-				statusCode:  http.StatusCreated,
-				contentType: "text/plain",
-				response:    "be8xnp4H",
+				statusCode: http.StatusCreated,
+				response:   "be8xnp4H",
 			},
 		},
 		{
@@ -77,9 +69,8 @@ func TestCreateShortURL(t *testing.T) {
 			contentType: "text/plain",
 			payload:     "https://go.dev/",
 			want: want{
-				statusCode:  http.StatusCreated,
-				contentType: "text/plain",
-				response:    "eDKZ8wBC",
+				statusCode: http.StatusCreated,
+				response:   "eDKZ8wBC",
 			},
 		},
 		{
@@ -87,9 +78,8 @@ func TestCreateShortURL(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			payload:     "https://go.dev/",
 			want: want{
-				statusCode:  http.StatusCreated,
-				contentType: "text/plain",
-				response:    "eDKZ8wBC",
+				statusCode: http.StatusCreated,
+				response:   "eDKZ8wBC",
 			},
 		},
 		{
@@ -97,9 +87,8 @@ func TestCreateShortURL(t *testing.T) {
 			contentType: "application/json",
 			payload:     "https://go.dev/",
 			want: want{
-				statusCode:  http.StatusBadRequest,
-				contentType: "text/plain; charset=utf-8",
-				response:    `Only "text/plain" Content-Type is allowed`,
+				statusCode: http.StatusBadRequest,
+				response:   `Only "text/plain" Content-Type is allowed`,
 			},
 		},
 		{
@@ -107,98 +96,115 @@ func TestCreateShortURL(t *testing.T) {
 			contentType: "text/plain",
 			payload:     "",
 			want: want{
-				statusCode:  http.StatusBadRequest,
-				contentType: "text/plain; charset=utf-8",
-				response:    `Empty body, must contain URL`,
+				statusCode: http.StatusBadRequest,
+				response:   `Empty body, must contain URL`,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, get := testRequest(t, ts, http.MethodPost, path, tt.contentType, tt.payload)
-			if strings.HasPrefix(get, "http") {
-				g := strings.Split(get, "/")
-				get = g[len(g)-1]
+			// create request with the content type being tested and the payload
+			// the method and the path are always the same
+			r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(tt.payload))
+			r.Header.Set("Content-Type", tt.contentType)
+
+			// response recorder
+			w := httptest.NewRecorder()
+
+			// context with mock store, stop test if failed to init context
+			hctx, err := NewHandlerContext(emptyMockStore)
+			require.NoError(t, err, "new handler context error")
+
+			// call the handler
+			hctx.CreateShortURL(w, r)
+
+			// get recorded data
+			res := w.Result()
+
+			// read the data and close the body; stop test if failed to read body
+			resBody, err := io.ReadAll(res.Body)
+			defer res.Body.Close()
+			require.NoError(t, err)
+
+			// if response contains URL (positive scenarios), take only short URL
+			strResBody := string(resBody)
+			if strings.HasPrefix(strResBody, "http") {
+				g := strings.Split(strResBody, "/")
+				strResBody = g[len(g)-1]
 			}
-			resp.Body.Close()
-			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
-			assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))
-			assert.Equal(t, tt.want.response, strings.TrimSpace(get))
+
+			// assert wanted data
+			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+			assert.Equal(t, contentType, res.Header.Get("Content-Type"))
+			assert.Equal(t, tt.want.response, strings.TrimSpace(strResBody))
 		})
 	}
 }
 
 func TestHandleShortURLRedirect(t *testing.T) {
-	tsToCreate := httptest.NewServer(createShortURLRouter())
-	defer tsToCreate.Close()
-
-	tsToRetrieve := httptest.NewServer(createHandleShortURLRedirectRouter())
-	tsToRetrieve.Client().CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-	defer tsToRetrieve.Close()
-
-	contentType := "text/plain"
+	// should always return "text/plain; charset=utf-8" content type
+	contentType := "text/plain; charset=utf-8"
 
 	type want struct {
 		statusCode int
 		response   string
 	}
+
 	tests := []struct {
-		name       string
-		path       string
-		createMock bool
-		want       want
+		name     string
+		shortURL string
+		store    db.Storage
+		want     want
 	}{
 		{
-			name:       "positive test #1",
-			path:       "/be8xnp4H",
-			createMock: true,
+			name:     "positive test #1",
+			shortURL: "be8xnp4H",
+			store:    &mockStore{expectedData: "https://e.mail.ru/inbox/"},
 			want: want{
 				statusCode: http.StatusTemporaryRedirect,
 				response:   "https://e.mail.ru/inbox/",
 			},
 		},
 		{
-			name:       "positive test #2",
-			path:       "/eDKZ8wBC",
-			createMock: true,
+			name:     "positive test #2",
+			shortURL: "eDKZ8wBC",
+			store:    &mockStore{expectedData: "https://go.dev/"},
 			want: want{
 				statusCode: http.StatusTemporaryRedirect,
 				response:   "https://go.dev/",
 			},
 		},
 		{
-			name:       "negative test #1: too long URL",
-			path:       "/too_long_URL", // > 8 characters
-			createMock: true,
+			name:     "negative test #1: too long URL",
+			shortURL: "too_long_URL", // > 8 characters
+			store:    &mockStore{expectedData: ""},
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   "Invalid URL: too_long_URL",
 			},
 		},
 		{
-			name:       "negative test #2: too short URL",
-			path:       "/short", // < 8 characters
-			createMock: true,
+			name:     "negative test #2: too short URL",
+			shortURL: "short", // < 8 characters
+			store:    &mockStore{expectedData: ""},
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   "Invalid URL: short",
 			},
 		},
 		{
-			name:       "negative test #3: invalid base58 characters",
-			path:       "/O0Il0O", // 0OIl+/ are not used
-			createMock: true,
+			name:     "negative test #3: invalid base58 characters",
+			shortURL: "O0Il0O", // 0OIl+/ are not used
+			store:    &mockStore{expectedData: ""},
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   "Invalid URL: O0Il0O",
 			},
 		},
 		{
-			name:       "negative test #4: no such URL",
-			path:       "/2x1xx1x2",
-			createMock: false,
+			name:     "negative test #4: no such URL",
+			shortURL: "2x1xx1x2",
+			store:    &mockStore{expectedData: ""},
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   "No such URL: 2x1xx1x2",
@@ -207,19 +213,40 @@ func TestHandleShortURLRedirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.createMock {
-				resp, _ := testRequest(t, tsToCreate, http.MethodPost, "/", contentType, tt.want.response)
-				resp.Body.Close()
-			}
-			resp, get := testRequest(t, tsToRetrieve, http.MethodGet, tt.path, contentType, "")
-			resp.Body.Close()
+			r := httptest.NewRequest(http.MethodGet, "/{shortURL}", http.NoBody)
 
-			assert.Equal(t, tt.want.statusCode, resp.StatusCode)
+			// add context to the request so that chi can identify the dynamic part of the URL
+			rctx := chi.NewRouteContext()
+			rctx.URLParams.Add("shortURL", tt.shortURL)
 
-			if resp.StatusCode != http.StatusBadRequest {
-				assert.Equal(t, tt.want.response, resp.Header.Get("Location"))
+			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+
+			// response recorder
+			w := httptest.NewRecorder()
+
+			// context with mock store, stop test if failed to init context
+			hctx, err := NewHandlerContext(tt.store)
+			require.NoError(t, err, "new handler context error")
+
+			// call the handler
+			hctx.HandleShortURLRedirect(w, r)
+
+			// get recorded data
+			res := w.Result()
+
+			// read the data and close the body; stop test if failed to read body
+			resBody, err := io.ReadAll(res.Body)
+			defer res.Body.Close()
+			require.NoError(t, err)
+
+			// assert wanted data
+			assert.Equal(t, contentType, res.Header.Get("Content-Type"))
+			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+
+			if res.StatusCode != http.StatusBadRequest {
+				assert.Equal(t, tt.want.response, res.Header.Get("Location"))
 			} else {
-				assert.Equal(t, tt.want.response, strings.TrimSpace(get))
+				assert.Equal(t, tt.want.response, strings.TrimSpace(string(resBody)))
 			}
 		})
 	}

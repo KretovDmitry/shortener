@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-var ErrNotFound = errors.New("URL not found")
+var ErrURLNotFound = errors.New("URL not found")
 
 type inMemoryStore struct {
 	mu    sync.RWMutex
@@ -22,7 +22,7 @@ func (s *inMemoryStore) RetrieveInitialURL(key string) (string, error) {
 	defer s.mu.RUnlock()
 	url, found := s.store[key]
 	if !found {
-		return "", ErrNotFound
+		return "", ErrURLNotFound
 	}
 	return url, nil
 }

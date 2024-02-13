@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// sha256of hashes the initial input using standart sha256 hash function
+// sha256of hashes the initial input using standard sha256 hash function
 func sha256Of(input []byte) []byte {
 	algorithm := sha256.New()
 	algorithm.Write(input)

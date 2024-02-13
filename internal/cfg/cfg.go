@@ -59,7 +59,7 @@ func ParseFlags() error {
 	AddrToReturn.Host = defaultHost
 	AddrToReturn.Port = defaultPort
 
-	// flags take precedence over default values
+	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
 	flag.Parse()

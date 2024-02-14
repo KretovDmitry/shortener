@@ -40,7 +40,7 @@ func TestCreateShortURL(t *testing.T) {
 	emptyMockStore := &mockStore{expectedData: ""}
 
 	// should always return "text/plain; charset=utf-8" content type
-	contentType := "text/plain; charset=utf-8"
+	expectedResponseContentType := "text/plain; charset=utf-8"
 
 	path := "/"
 
@@ -50,51 +50,51 @@ func TestCreateShortURL(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		contentType string
-		payload     string
-		want        want
+		name               string
+		requestContentType string
+		payload            string
+		want               want
 	}{
 		{
-			name:        "positive test #1",
-			contentType: "text/plain",
-			payload:     "https://e.mail.ru/inbox/",
+			name:               "positive test #1",
+			requestContentType: "text/plain",
+			payload:            "https://e.mail.ru/inbox/",
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "be8xnp4H",
 			},
 		},
 		{
-			name:        "positive test #2",
-			contentType: "text/plain",
-			payload:     "https://go.dev/",
+			name:               "positive test #2",
+			requestContentType: "text/plain",
+			payload:            "https://go.dev/",
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "eDKZ8wBC",
 			},
 		},
 		{
-			name:        "positive test #3: charset=utf-8",
-			contentType: "text/plain; charset=utf-8",
-			payload:     "https://go.dev/",
+			name:               "positive test #3: charset=utf-8",
+			requestContentType: "text/plain; charset=utf-8",
+			payload:            "https://go.dev/",
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "eDKZ8wBC",
 			},
 		},
 		{
-			name:        "negative test #1: invalid Content-Type",
-			contentType: "application/json",
-			payload:     "https://go.dev/",
+			name:               "negative test #1: invalid Content-Type",
+			requestContentType: "application/json",
+			payload:            "https://go.dev/",
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   `Only "text/plain" Content-Type is allowed`,
 			},
 		},
 		{
-			name:        "negative test #2: empty body",
-			contentType: "text/plain",
-			payload:     "",
+			name:               "negative test #2: empty body",
+			requestContentType: "text/plain",
+			payload:            "",
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   `Empty body, must contain URL`,
@@ -106,7 +106,7 @@ func TestCreateShortURL(t *testing.T) {
 			// create request with the content type being tested and the payload
 			// the method and the path are always the same
 			r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(tt.payload))
-			r.Header.Set("Content-Type", tt.contentType)
+			r.Header.Set("Content-Type", tt.requestContentType)
 
 			// response recorder
 			w := httptest.NewRecorder()
@@ -135,7 +135,7 @@ func TestCreateShortURL(t *testing.T) {
 
 			// assert wanted data
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-			assert.Equal(t, contentType, res.Header.Get("Content-Type"))
+			assert.Equal(t, expectedResponseContentType, res.Header.Get("Content-Type"))
 			assert.Equal(t, tt.want.response, strings.TrimSpace(strResBody))
 		})
 	}

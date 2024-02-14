@@ -20,7 +20,7 @@ type netAddress struct {
 	Port int
 }
 
-// NewNetAddress returns pointer to new netAddress with default Host and Port
+// NewNetAddress returns pointer to a new netAddress with default Host and Port
 func NewNetAddress() *netAddress {
 	return &netAddress{
 		Host: defaultHost,

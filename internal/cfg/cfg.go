@@ -52,16 +52,14 @@ func (a *netAddress) Set(s string) error {
 var (
 	AddrToRun    = NewNetAddress()
 	AddrToReturn = NewNetAddress()
+	LogLevel     string
 )
 
 func ParseFlags() error {
-	// compile time flag.Value interface implementation verification
-	_ = flag.Value(AddrToRun)
-	_ = flag.Value(AddrToReturn)
-
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
+	flag.StringVar(&LogLevel, "l", "info", "log level")
 	flag.Parse()
 
 	// ENV variables have the highest priority
@@ -77,6 +75,11 @@ func ParseFlags() error {
 		if err != nil {
 			return errors.Wrap(err, "invalid BASE_URL")
 		}
+	}
+
+	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
+		LogLevel = envLogLevel
+
 	}
 
 	return nil

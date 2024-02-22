@@ -12,9 +12,8 @@ type inMemoryStore struct {
 	store map[string]string
 }
 
-func NewInMemoryStore() Storage {
-	var store Storage = &inMemoryStore{store: make(map[string]string)}
-	return store
+func NewInMemoryStore() *inMemoryStore {
+	return &inMemoryStore{store: make(map[string]string)}
 }
 
 func (s *inMemoryStore) RetrieveInitialURL(key string) (string, error) {

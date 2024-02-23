@@ -1,4 +1,3 @@
-// Package handler provides handlers.
 package handler
 
 import (
@@ -6,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -32,6 +32,50 @@ func (s *mockStore) RetrieveInitialURL(shortURL string) (string, error) {
 		return "", db.ErrURLNotFound
 	}
 	return s.expectedData, nil
+}
+
+func TestNewHandlerContext(t *testing.T) {
+	emptyMockStore := &mockStore{expectedData: ""}
+
+	type args struct {
+		store db.Storage
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *handlerContext
+		wantErr bool
+	}{
+		{
+			name: "positive test #1",
+			args: args{
+				store: emptyMockStore,
+			},
+			want: &handlerContext{
+				store: emptyMockStore,
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil store",
+			args: args{
+				store: nil,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewHandlerContext(tt.args.store)
+			if !assert.Equal(t, tt.wantErr, err != nil) {
+				t.Errorf("Error message: %s\n", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestCreateShortURL(t *testing.T) {
@@ -145,69 +189,74 @@ func TestHandleShortURLRedirect(t *testing.T) {
 	// should always return "text/plain; charset=utf-8" content type
 	contentType := "text/plain; charset=utf-8"
 
-	type want struct {
-		statusCode int
-		response   string
-	}
-
 	tests := []struct {
 		name     string
 		shortURL string
 		store    db.Storage
-		want     want
+		want     func(res *http.Response)
 	}{
 		{
 			name:     "positive test #1",
 			shortURL: "be8xnp4H",
 			store:    &mockStore{expectedData: "https://e.mail.ru/inbox/"},
-			want: want{
-				statusCode: http.StatusTemporaryRedirect,
-				response:   "https://e.mail.ru/inbox/",
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+				assert.Equal(t, "https://e.mail.ru/inbox/", res.Header.Get("Location"))
 			},
 		},
 		{
 			name:     "positive test #2",
 			shortURL: "eDKZ8wBC",
 			store:    &mockStore{expectedData: "https://go.dev/"},
-			want: want{
-				statusCode: http.StatusTemporaryRedirect,
-				response:   "https://go.dev/",
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+				assert.Equal(t, "https://go.dev/", res.Header.Get("Location"))
 			},
 		},
 		{
 			name:     "negative test #1: too long URL",
-			shortURL: "too_long_URL", // > 8 characters
+			shortURL: "Too_Long_URL", // > 8 characters
 			store:    &mockStore{expectedData: ""},
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   "Invalid URL: too_long_URL",
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				resBody := getPayload(t, res)
+				assert.Equal(t, "Invalid URL: Too_Long_URL", resBody)
 			},
 		},
 		{
 			name:     "negative test #2: too short URL",
 			shortURL: "short", // < 8 characters
 			store:    &mockStore{expectedData: ""},
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   "Invalid URL: short",
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				resBody := getPayload(t, res)
+				assert.Equal(t, "Invalid URL: short", resBody)
 			},
 		},
 		{
 			name:     "negative test #3: invalid base58 characters",
 			shortURL: "O0Il0O", // 0OIl+/ are not used
 			store:    &mockStore{expectedData: ""},
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   "Invalid URL: O0Il0O",
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				resBody := getPayload(t, res)
+				assert.Equal(t, "Invalid URL: O0Il0O", resBody)
 			},
 		},
 		{
 			name:     "negative test #4: no such URL",
 			shortURL: "2x1xx1x2",
 			store:    &mockStore{expectedData: ""},
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   "No such URL: 2x1xx1x2",
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				resBody := getPayload(t, res)
+				assert.Equal(t, "No such URL: 2x1xx1x2", resBody)
 			},
 		},
 	}
@@ -234,20 +283,17 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			// get recorded data
 			res := w.Result()
 
-			// read the data and close the body; stop test if failed to read body
-			resBody, err := io.ReadAll(res.Body)
-			defer res.Body.Close()
-			require.NoError(t, err)
-
 			// assert wanted data
 			assert.Equal(t, contentType, res.Header.Get("Content-Type"))
-			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-
-			if res.StatusCode != http.StatusBadRequest {
-				assert.Equal(t, tt.want.response, res.Header.Get("Location"))
-			} else {
-				assert.Equal(t, tt.want.response, strings.TrimSpace(string(resBody)))
-			}
+			tt.want(res)
 		})
 	}
+}
+
+func getPayload(t *testing.T, res *http.Response) string {
+	resBody, err := io.ReadAll(res.Body)
+	defer res.Body.Close()
+	require.NoError(t, err)
+
+	return strings.TrimSpace(string(resBody))
 }

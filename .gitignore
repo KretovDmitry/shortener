@@ -21,3 +21,8 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# Log files
+cmd/log/app.log
+cmd/log/
+.log

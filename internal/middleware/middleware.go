@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -19,6 +21,10 @@ type (
 	}
 )
 
+func newLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
+	return &loggingResponseWriter{w, &responseData{}}
+}
+
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := r.ResponseWriter.Write(b)
 	r.responseData.size += size
@@ -30,29 +36,29 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
-func RequestInfo(zl *zap.Logger, h http.HandlerFunc) http.HandlerFunc {
+func RequestLogger(next http.HandlerFunc) http.HandlerFunc {
 	return (func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		l := logger.Get()
 
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
+		lrw := newLoggingResponseWriter(w)
 
-		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-		h(&lw, r)
+		defer func(start time.Time) {
+			l.Info(
+				fmt.Sprintf(
+					"%s request to %s completed",
+					r.Method,
+					r.RequestURI,
+				),
+				zap.String("url", r.RequestURI),
+				zap.String("method", r.Method),
+				zap.Int("status", lrw.responseData.status),
+				zap.Duration("duration", time.Since(start)),
+				zap.Int("size", lrw.responseData.size),
+			)
+		}(time.Now())
 
-		duration := time.Since(start)
+		defer l.Sync()
 
-		zl.Info("incoming HTTP request",
-			zap.String("uri", r.RequestURI),
-			zap.String("method", r.Method),
-			zap.Int("status", responseData.status),
-			zap.Duration("duration", duration),
-			zap.Int("size", responseData.size),
-		)
+		next(lrw, r)
 	})
 }

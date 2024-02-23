@@ -1,19 +1,19 @@
-// Package handler provides handlers.
 package handler
 
 import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/cfg"
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type handlerContext struct {
@@ -26,10 +26,15 @@ func NewHandlerContext(store db.Storage) (*handlerContext, error) {
 	if store == nil {
 		return nil, errors.New("nil store")
 	}
-	return &handlerContext{store}, nil
+	return &handlerContext{
+		store: store,
+	}, nil
 }
 
 func (ctx *handlerContext) CreateShortURL(w http.ResponseWriter, r *http.Request) {
+	l := logger.Get()
+	defer l.Sync()
+
 	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
 	if i := strings.Index(contentType, ";"); i > -1 {
 		contentType = contentType[0:i]
@@ -42,7 +47,7 @@ func (ctx *handlerContext) CreateShortURL(w http.ResponseWriter, r *http.Request
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("create short URL failed to read body: %s\n", err)
+		l.Error("failed to read request body", zap.Error(err))
 		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 		return
 	}
@@ -57,13 +62,13 @@ func (ctx *handlerContext) CreateShortURL(w http.ResponseWriter, r *http.Request
 
 	shortURL, err := shorturl.Generate(originalURL)
 	if err != nil {
-		log.Printf("create short URL: %s\n", err)
+		l.Error("failed to generate short URL", zap.Error(err))
 		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 		return
 	}
 
 	if err := ctx.store.SaveURL(shortURL, originalURL); err != nil {
-		log.Printf("store save URL: %s\n", err)
+		l.Error("failed to save URL", zap.Error(err))
 		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 		return
 	}

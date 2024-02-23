@@ -282,6 +282,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 
 			// get recorded data
 			res := w.Result()
+			defer res.Body.Close()
 
 			// assert wanted data
 			assert.Equal(t, contentType, res.Header.Get("Content-Type"))

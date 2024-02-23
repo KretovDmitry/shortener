@@ -39,6 +39,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 func RequestLogger(next http.HandlerFunc) http.HandlerFunc {
 	return (func(w http.ResponseWriter, r *http.Request) {
 		l := logger.Get()
+		defer l.Sync()
 
 		lrw := newLoggingResponseWriter(w)
 
@@ -56,8 +57,6 @@ func RequestLogger(next http.HandlerFunc) http.HandlerFunc {
 				zap.Int("size", lrw.responseData.size),
 			)
 		}(time.Now())
-
-		defer l.Sync()
 
 		next(lrw, r)
 	})

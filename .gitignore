@@ -23,6 +23,6 @@ vendor/
 .vscode
 
 # Log files
-cmd/log/app.log
-cmd/log/
-.log
+cmd/logs/app.log
+cmd/logs/
+*.log

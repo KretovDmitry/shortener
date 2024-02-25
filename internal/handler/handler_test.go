@@ -160,7 +160,7 @@ func TestCreateShortURL(t *testing.T) {
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			hctx.CreateShortURL(w, r)
+			hctx.ShortenText(w, r)
 
 			// get recorded data
 			res := w.Result()

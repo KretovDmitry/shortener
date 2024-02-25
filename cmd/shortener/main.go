@@ -33,8 +33,9 @@ func run() error {
 
 	r := chi.NewRouter()
 
-	r.Post("/", middleware.RequestLogger(hctx.CreateShortURL))
+	r.Post("/", middleware.RequestLogger(hctx.ShortenText))
 	r.Get("/{shortURL}", middleware.RequestLogger(hctx.HandleShortURLRedirect))
+	r.Post("/api/shorten", middleware.RequestLogger(hctx.ShortenJSON))
 
 	fmt.Println("Running server on", cfg.AddrToRun)
 	fmt.Println("Returning with", cfg.AddrToReturn)

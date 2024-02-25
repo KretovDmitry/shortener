@@ -8,23 +8,10 @@ import (
 	"sync"
 
 	"github.com/KretovDmitry/shortener/internal/cfg"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
-
-func New(loggingLevel string) (*zap.Logger, error) {
-	level, err := zap.ParseAtomicLevel(loggingLevel)
-	if err != nil {
-		return nil, errors.Wrap(err, "parse atomic level")
-	}
-
-	cfg := zap.NewDevelopmentConfig()
-	cfg.Level = level
-
-	return cfg.Build()
-}
 
 var once sync.Once
 

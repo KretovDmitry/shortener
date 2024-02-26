@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +16,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	contentType     = "Content-Type"
+	textPlain       = "text/plain; charset=utf-8"
+	applicationJSON = "application/json"
 )
 
 // mokeStore must implement db.Storage interface
@@ -57,7 +66,7 @@ func TestNewHandlerContext(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "nil store",
+			name: "negative test #1: nil store",
 			args: args{
 				store: nil,
 			},
@@ -78,13 +87,10 @@ func TestNewHandlerContext(t *testing.T) {
 	}
 }
 
-func TestCreateShortURL(t *testing.T) {
+func TestShortenText(t *testing.T) {
 	// we don't retrieve any data from the store
 	// handler returns newly created short URL
 	emptyMockStore := &mockStore{expectedData: ""}
-
-	// should always return "text/plain; charset=utf-8" content type
-	expectedResponseContentType := "text/plain; charset=utf-8"
 
 	path := "/"
 
@@ -101,7 +107,7 @@ func TestCreateShortURL(t *testing.T) {
 	}{
 		{
 			name:               "positive test #1",
-			requestContentType: "text/plain",
+			requestContentType: textPlain,
 			payload:            "https://e.mail.ru/inbox/",
 			want: want{
 				statusCode: http.StatusCreated,
@@ -110,7 +116,7 @@ func TestCreateShortURL(t *testing.T) {
 		},
 		{
 			name:               "positive test #2",
-			requestContentType: "text/plain",
+			requestContentType: textPlain,
 			payload:            "https://go.dev/",
 			want: want{
 				statusCode: http.StatusCreated,
@@ -128,7 +134,7 @@ func TestCreateShortURL(t *testing.T) {
 		},
 		{
 			name:               "negative test #1: invalid Content-Type",
-			requestContentType: "application/json",
+			requestContentType: applicationJSON,
 			payload:            "https://go.dev/",
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -137,7 +143,7 @@ func TestCreateShortURL(t *testing.T) {
 		},
 		{
 			name:               "negative test #2: empty body",
-			requestContentType: "text/plain",
+			requestContentType: textPlain,
 			payload:            "",
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -147,10 +153,10 @@ func TestCreateShortURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// create request with the content type being tested and the payload
+			// create request with the content type and the payload being tested
 			// the method and the path are always the same
 			r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(tt.payload))
-			r.Header.Set("Content-Type", tt.requestContentType)
+			r.Header.Set(contentType, tt.requestContentType)
 
 			// response recorder
 			w := httptest.NewRecorder()
@@ -179,16 +185,149 @@ func TestCreateShortURL(t *testing.T) {
 
 			// assert wanted data
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-			assert.Equal(t, expectedResponseContentType, res.Header.Get("Content-Type"))
+			assert.Equal(t, textPlain, res.Header.Get(contentType))
 			assert.Equal(t, tt.want.response, strings.TrimSpace(strResBody))
 		})
 	}
 }
 
-func TestHandleShortURLRedirect(t *testing.T) {
-	// should always return "text/plain; charset=utf-8" content type
-	contentType := "text/plain; charset=utf-8"
+func TestShortenJSON(t *testing.T) {
+	// we don't retrieve any data from the store
+	// handler returns newly created short URL
+	emptyMockStore := &mockStore{expectedData: ""}
 
+	path := "/api/shorten"
+
+	createJSONRequestPayload := func(url string) shortenJSONRequestPayload {
+		return shortenJSONRequestPayload{URL: url}
+	}
+
+	getJSONResponsePayload := func(r *http.Response) shortenJSONResponsePayload {
+		decoder := json.NewDecoder(r.Body)
+		defer r.Body.Close()
+		var res shortenJSONResponsePayload
+		err := decoder.Decode(&res)
+		require.NoError(t, err, "failed to read JSON body")
+		return res
+	}
+
+	getShortURL := func(s string) (res string) {
+		if strings.HasPrefix(s, "http") {
+			slice := strings.Split(s, "/")
+			res = slice[len(slice)-1]
+		}
+		return
+	}
+
+	tests := []struct {
+		name               string
+		requestContentType string
+		payload            shortenJSONRequestPayload
+		want               func(r *http.Response)
+	}{
+		{
+			name:               "positive test #1",
+			requestContentType: applicationJSON,
+			payload:            createJSONRequestPayload("https://e.mail.ru/inbox/"),
+			want: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusCreated, r.StatusCode)
+				if assert.Equal(t, applicationJSON, r.Header.Get(contentType)) {
+					payload := getJSONResponsePayload(r)
+					shortURL := getShortURL(string(payload.Result))
+					assert.Equal(t, "be8xnp4H", shortURL)
+				}
+			},
+		},
+		{
+			name:               "positive test #2",
+			requestContentType: applicationJSON,
+			payload:            createJSONRequestPayload("https://go.dev/"),
+			want: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusCreated, r.StatusCode)
+				if assert.Equal(t, applicationJSON, r.Header.Get(contentType)) {
+					payload := getJSONResponsePayload(r)
+					shortURL := getShortURL(string(payload.Result))
+					assert.Equal(t, "eDKZ8wBC", shortURL)
+				}
+			},
+		},
+		{
+			name:               "negative test #1: invalid Content-Type",
+			requestContentType: textPlain,
+			payload:            createJSONRequestPayload("https://go.dev/"),
+			want: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
+				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
+					payload := getTextPayload(t, r)
+					expectedResponse := fmt.Sprintf(
+						`Only "%s" Content-Type is allowed`, applicationJSON,
+					)
+					assert.Equal(t, expectedResponse, payload)
+				}
+			},
+		},
+		{
+			name:               "negative test #2: empty URL field",
+			requestContentType: applicationJSON,
+			payload:            createJSONRequestPayload(""),
+			want: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
+				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
+					payload := getTextPayload(t, r)
+					expectedResponse := "The URL field in the JSON body of the request is empty"
+					assert.Equal(t, expectedResponse, payload)
+				}
+			},
+		},
+		{
+			name:               "negative test #3: invalid URL",
+			requestContentType: applicationJSON,
+			payload:            createJSONRequestPayload("https://test...com"),
+			want: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
+				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
+					payload := getTextPayload(t, r)
+					expectedResponse := "The provided string is not a URL: https://test...com"
+					assert.Equal(t, expectedResponse, payload)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := json.Marshal(tt.payload)
+			require.NoError(t, err, "failed to Marshall payload")
+			payload := bytes.NewBuffer(p)
+
+			// create request with the content type and the payload being tested
+			// the method and the path are always the same
+			r := httptest.NewRequest(http.MethodPost, path, payload)
+			r.Header.Set(contentType, tt.requestContentType)
+
+			// response recorder
+			w := httptest.NewRecorder()
+
+			// context with mock store, stop test if failed to init context
+			hctx, err := NewHandlerContext(emptyMockStore)
+			require.NoError(t, err, "new handler context error")
+
+			// call the handler
+			hctx.ShortenJSON(w, r)
+
+			// get recorded data
+			res := w.Result()
+
+			// assert wanted result
+			tt.want(res)
+		})
+	}
+}
+func TestHandleShortURLRedirect(t *testing.T) {
 	tests := []struct {
 		name     string
 		shortURL string
@@ -222,7 +361,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getPayload(t, res)
+				resBody := getTextPayload(t, res)
 				assert.Equal(t, "Invalid URL: Too_Long_URL", resBody)
 			},
 		},
@@ -233,7 +372,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getPayload(t, res)
+				resBody := getTextPayload(t, res)
 				assert.Equal(t, "Invalid URL: short", resBody)
 			},
 		},
@@ -244,7 +383,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getPayload(t, res)
+				resBody := getTextPayload(t, res)
 				assert.Equal(t, "Invalid URL: O0Il0O", resBody)
 			},
 		},
@@ -255,7 +394,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getPayload(t, res)
+				resBody := getTextPayload(t, res)
 				assert.Equal(t, "No such URL: 2x1xx1x2", resBody)
 			},
 		},
@@ -285,13 +424,13 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			defer res.Body.Close()
 
 			// assert wanted data
-			assert.Equal(t, contentType, res.Header.Get("Content-Type"))
+			assert.Equal(t, textPlain, res.Header.Get(contentType))
 			tt.want(res)
 		})
 	}
 }
 
-func getPayload(t *testing.T, res *http.Response) string {
+func getTextPayload(t *testing.T, res *http.Response) string {
 	resBody, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	require.NoError(t, err)

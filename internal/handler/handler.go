@@ -80,14 +80,14 @@ func (ctx *handlerContext) ShortenText(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf("http://%s/%s", cfg.AddrToReturn, shortURL)))
 }
 
-type ShortenJSONRequestPayload struct {
+type shortenJSONRequestPayload struct {
 	URL string `json:"url,omitempty"`
 }
 
 type (
 	shortURL string
 
-	ShortenJSONResponsePayload struct {
+	shortenJSONResponsePayload struct {
 		Result shortURL `json:"result,omitempty"`
 	}
 )
@@ -119,7 +119,7 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var payload ShortenJSONRequestPayload
+	var payload shortenJSONRequestPayload
 
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
@@ -162,7 +162,7 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := ShortenJSONResponsePayload{
+	result := shortenJSONResponsePayload{
 		Result: shortURL(sURL),
 	}
 
@@ -172,7 +172,9 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	if err := encoder.Encode(result); err != nil {
 		l.Error("cannot encode response JSON body", zap.Error(err))
-		msg := "Couldn't encode response JSON body"
+		msg := fmt.Sprintf(
+			"Couldn't encode request JSON body: %s", err,
+		)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}

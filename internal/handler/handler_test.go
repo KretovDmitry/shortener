@@ -321,6 +321,7 @@ func TestShortenJSON(t *testing.T) {
 
 			// get recorded data
 			res := w.Result()
+			defer res.Body.Close()
 
 			// assert wanted result
 			tt.want(res)

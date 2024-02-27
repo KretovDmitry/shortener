@@ -28,13 +28,11 @@ const (
 type Config struct {
 	// gzip compression level to use,
 	// valid value: -3 => 9.
-	//
-	// see https://golang.org/pkg/compress/gzip/#NewWriterLevel
 	CompressionLevel int
 	// Minimum content length to trigger gzip,
 	// the unit is in byte.
 	//
-	// When `Content-Length` is not available, handler may buffer your writes to
+	// When `Content-Length` is not available, handler may buffer rites to
 	// decide if its big enough to do a meaningful compression.
 	// A high `MinContentLength` may bring memory overhead,
 	// although the handler tries to be smart by reusing buffers
@@ -80,7 +78,13 @@ func NewHandler(config Config) *Handler {
 		return writer
 	}
 	handler.wrapperPool.New = func() interface{} {
-		return newWriterWrapper(handler.responseHeaderFilter, handler.minContentLength, nil, handler.getGzipWriter, handler.putGzipWriter)
+		return newWriterWrapper(
+			handler.responseHeaderFilter,
+			handler.minContentLength,
+			nil, // original ResponseWriter
+			handler.getGzipWriter,
+			handler.putGzipWriter,
+		)
 	}
 
 	return &handler
@@ -139,6 +143,9 @@ func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 		var shouldCompress = true
 
 		for _, filter := range h.requestFilter {
+			// by default:
+			// 1. should satisfy the CommonRequestFilter verification
+			// 2. allow empty extension is set to true
 			shouldCompress = filter.ShouldCompress(r)
 			if !shouldCompress {
 				break

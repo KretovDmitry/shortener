@@ -9,8 +9,6 @@ import (
 // ResponseHeaderFilter decide whether or not to compress response
 // judging by response header
 type ResponseHeaderFilter interface {
-	// ShouldCompress decide whether or not to compress response,
-	// judging by response header
 	ShouldCompress(header http.Header) bool
 }
 

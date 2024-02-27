@@ -2,77 +2,99 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/KretovDmitry/shortener/internal/cfg"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
+	"github.com/KretovDmitry/shortener/internal/middleware/gzip"
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 )
 
 func main() {
 	l := logger.Get()
 	defer l.Sync()
 
-	if err := run(); err != nil {
-		l.Error("run", zap.Error(err))
-		os.Exit(1)
+	mux, err := initService()
+	if err != nil {
+		l.Fatal("initService failed", zap.Error(err))
 	}
+
+	server := &http.Server{
+		Addr:    cfg.AddrToRun.String(),
+		Handler: mux,
+	}
+
+	// Server run context
+	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	// Listen for syscall signals for process to interrupt/quit
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		<-sig
+
+		// Shutdown signal with grace period of 30 seconds
+		shutdownCtx, shutdownStopCtx := context.WithTimeout(serverCtx, 30*time.Second)
+
+		go func() {
+			<-shutdownCtx.Done()
+			if shutdownCtx.Err() == context.DeadlineExceeded {
+				log.Fatal("graceful shutdown timed out.. forcing exit")
+			}
+			shutdownStopCtx()
+		}()
+
+		// Trigger graceful shutdown
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
+			l.Fatal("graceful shutdown failed", zap.Error(err))
+		}
+		serverStopCtx()
+	}()
+
+	// Run the server
+	err = server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		l.Fatal("ListenAndServe failed", zap.Error(err))
+	}
+
+	// Wait for server context to be stopped
+	<-serverCtx.Done()
 }
 
-func run() error {
+func initService() (http.Handler, error) {
 	err := cfg.ParseFlags()
 	if err != nil {
-		return errors.Wrap(err, "parse flags")
+		return nil, errors.Wrap(err, "parse flags")
 	}
 
 	store := db.NewInMemoryStore()
 
 	hctx, err := handler.NewHandlerContext(store)
 	if err != nil {
-		return errors.Wrap(err, "new handler context")
+		return nil, errors.Wrap(err, "new handler context")
 	}
 
 	r := chi.NewRouter()
 
-	r.Post("/", middleware.RequestLogger(hctx.ShortenText))
-	r.Get("/{shortURL}", middleware.RequestLogger(hctx.HandleShortURLRedirect))
-	r.Post("/api/shorten", middleware.RequestLogger(hctx.ShortenJSON))
+	chain := middleware.BuildChain(
+		middleware.RequestLogger,
+		gzip.Unzip,
+	)
 
-	httpServer := &http.Server{
-		Addr:    cfg.AddrToRun.String(),
-		Handler: r,
-	}
+	r.Post("/", chain(hctx.ShortenText))
+	r.Get("/{shortURL}", chain(hctx.HandleShortURLRedirect))
+	r.Post("/api/shorten", chain(hctx.ShortenJSON))
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
-		<-c
-		cancel()
-	}()
-
-	g, gCtx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		fmt.Println("Running server on", cfg.AddrToRun)
-		fmt.Println("Returning with", cfg.AddrToReturn)
-		return httpServer.ListenAndServe()
-	})
-	g.Go(func() error {
-		<-gCtx.Done()
-		return httpServer.Shutdown(context.Background())
-	})
-
-	return g.Wait()
+	return gzip.DefaultHandler().WrapHandler(r), nil
 }

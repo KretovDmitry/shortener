@@ -10,8 +10,6 @@ import (
 
 // RequestFilter decide whether or not to compress response judging by request
 type RequestFilter interface {
-	// ShouldCompress decide whether or not to compress response,
-	// judging by request
 	ShouldCompress(req *http.Request) bool
 }
 
@@ -22,10 +20,9 @@ var (
 )
 
 // CommonRequestFilter judge via common easy criteria like
-// http method, accept-encoding header, etc.
+// http method, accept-encoding header, etc
 type CommonRequestFilter struct{}
 
-// NewCommonRequestFilter ...
 func NewCommonRequestFilter() *CommonRequestFilter {
 	return &CommonRequestFilter{}
 }
@@ -40,13 +37,12 @@ func (c *CommonRequestFilter) ShouldCompress(req *http.Request) bool {
 
 // ExtensionFilter judge via the extension in path
 //
-// Omit this filter if you want to compress all extension.
+// Omit this filter if you want to compress all extension
 type ExtensionFilter struct {
 	Exts       *acascii.Matcher
 	AllowEmpty bool
 }
 
-// NewExtensionFilter returns a extension or panics
 func NewExtensionFilter(extensions []string) *ExtensionFilter {
 	var (
 		exts       = make([]string, 0, len(extensions))
@@ -76,7 +72,7 @@ func (e *ExtensionFilter) ShouldCompress(req *http.Request) bool {
 	return e.Exts.MatchString(ext)
 }
 
-// defaultExtensions is the list of default extensions for which to enable gzip.
+// defaultExtensions is the list of default extensions for which to enable gzip
 var defaultExtensions = []string{"", ".txt", ".htm", ".html", ".css", ".php", ".js", ".json",
 	".md", ".mdown", ".xml", ".svg", ".go", ".cgi", ".py", ".pl", ".aspx", ".asp", ".m3u", ".m3u8", ".wasm"}
 

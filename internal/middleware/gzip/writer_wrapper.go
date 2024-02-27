@@ -217,8 +217,6 @@ func (w *writerWrapper) WriteHeader(statusCode int) {
 // WriteHeaderNow must always be called and called after
 // WriteHeader() is called and
 // w.shouldCompress is decided.
-//
-// This method is usually called by gin's AbortWithStatus()
 func (w *writerWrapper) WriteHeaderNow() {
 	if w.headerFlushed {
 		return

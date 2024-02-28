@@ -46,7 +46,7 @@ func (c *compressReader) Close() error {
 func Unzip(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := logger.Get()
-		l.Sync()
+		defer l.Sync()
 
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := strings.Contains(contentEncoding, "gzip")

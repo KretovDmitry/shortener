@@ -35,10 +35,8 @@ type writerWrapper struct {
 	headerFlushed         bool
 	responseHeaderChecked bool
 	statusCode            int
-	// how many raw bytes has been written
-	size       int
-	gzipWriter *gzip.Writer
-	bodyBuffer []byte
+	gzipWriter            *gzip.Writer
+	bodyBuffer            []byte
 }
 
 // interface guard
@@ -76,7 +74,6 @@ func (w *writerWrapper) Reset(originWriter http.ResponseWriter) {
 	w.responseHeaderChecked = false
 	w.bodyBigEnough = false
 	w.statusCode = 0
-	w.size = 0
 
 	if w.gzipWriter != nil {
 		w.PutGzipWriter(w.gzipWriter)
@@ -103,8 +100,6 @@ func (w *writerWrapper) Header() http.Header {
 
 // Write implements http.ResponseWriter
 func (w *writerWrapper) Write(data []byte) (int, error) {
-	w.size += len(data)
-
 	if !w.WriteHeaderCalled() {
 		w.WriteHeader(http.StatusOK)
 	}
@@ -185,11 +180,10 @@ func (w *writerWrapper) enoughContentLength() bool {
 // WriteHeader implements http.ResponseWriter
 //
 // WriteHeader does not really calls originalHandler's WriteHeader,
-// and the calling will actually be handler by WriteHeaderNow().
+// and the calling will actually be handled by WriteHeaderNow().
 //
 // http.ResponseWriter does not specify clearly whether permitting
-// updating status code on second call to WriteHeader(), and it's
-// conflicting between http and gin's implementation.
+// updating status code on second call to WriteHeader().
 // Here, gzip consider second(and furthermore) calls to WriteHeader()
 // valid. WriteHeader() is disabled after flushing header.
 // Do note setting status code to 204 or 304 marks content incompressible,

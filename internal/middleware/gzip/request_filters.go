@@ -73,10 +73,12 @@ func (e *ExtensionFilter) ShouldCompress(req *http.Request) bool {
 }
 
 // defaultExtensions is the list of default extensions for which to enable gzip
-var defaultExtensions = []string{"", ".txt", ".htm", ".html", ".css", ".php", ".js", ".json",
-	".md", ".mdown", ".xml", ".svg", ".go", ".cgi", ".py", ".pl", ".aspx", ".asp", ".m3u", ".m3u8", ".wasm"}
+var defaultExtensions = []string{
+	"", ".txt", ".htm", ".html", ".css", ".php", ".js", ".json",
+	".md", ".mdown", ".xml", ".svg", ".go", ".cgi", ".py", ".pl",
+	".aspx", ".asp", ".m3u", ".m3u8", ".wasm",
+}
 
-// DefaultExtensionFilter permits
 func DefaultExtensionFilter() *ExtensionFilter {
 	return NewExtensionFilter(defaultExtensions)
 }

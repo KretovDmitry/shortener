@@ -143,9 +143,6 @@ func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 		var shouldCompress = true
 
 		for _, filter := range h.requestFilter {
-			// by default:
-			// 1. should satisfy the CommonRequestFilter verification
-			// 2. allow empty extension is set to true
 			shouldCompress = filter.ShouldCompress(r)
 			if !shouldCompress {
 				break

@@ -69,7 +69,18 @@ func (e *ContentTypeFilter) ShouldCompress(header http.Header) bool {
 }
 
 // defaultContentType is the list of default content types for which to enable gzip
-var defaultContentType = []string{"text/html", "text/richtext", "text/plain", "text/css", "text/x-script", "text/x-component", "text/x-java-source", "text/x-markdown", "application/javascript", "application/x-javascript", "text/javascript", "text/js", "image/x-icon", "application/x-perl", "application/x-httpd-cgi", "text/xml", "application/xml", "application/xml+rss", "application/json", "multipart/bag", "multipart/mixed", "application/xhtml+xml", "font/ttf", "font/otf", "font/x-woff", "image/svg+xml", "application/vnd.ms-fontobject", "application/ttf", "application/x-ttf", "application/otf", "application/x-otf", "application/truetype", "application/opentype", "application/x-opentype", "application/font-woff", "application/eot", "application/font", "application/font-sfnt", "application/wasm"}
+var defaultContentType = []string{
+	"text/html", "text/richtext", "text/plain", "text/css", "text/x-script",
+	"text/x-component", "text/x-java-source", "text/x-markdown", "application/javascript",
+	"application/x-javascript", "text/javascript", "text/js", "image/x-icon",
+	"application/x-perl", "application/x-httpd-cgi", "text/xml", "application/xml",
+	"application/xml+rss", "application/json", "multipart/bag", "multipart/mixed",
+	"application/xhtml+xml", "font/ttf", "font/otf", "font/x-woff", "image/svg+xml",
+	"application/vnd.ms-fontobject", "application/ttf", "application/x-ttf",
+	"application/otf", "application/x-otf", "application/truetype",
+	"application/opentype", "application/x-opentype", "application/font-woff",
+	"application/eot", "application/font", "application/font-sfnt", "application/wasm",
+}
 
 func DefaultContentTypeFilter() *ContentTypeFilter {
 	return NewContentTypeFilter(defaultContentType)

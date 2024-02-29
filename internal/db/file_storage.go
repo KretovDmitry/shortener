@@ -109,9 +109,9 @@ func (fs *fileStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
 }
 
 func (fs *fileStore) SaveURL(sURL ShortURL, url OriginalURL) error {
-	_, err := fs.cache.RetrieveInitialURL(sURL)
-	if err != nil && err != ErrURLNotFound {
-		return err
+	savedURL, _ := fs.cache.RetrieveInitialURL(sURL)
+	if savedURL == url {
+		return nil
 	}
 
 	fs.cache.SaveURL(sURL, url)

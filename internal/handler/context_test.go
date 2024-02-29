@@ -24,17 +24,17 @@ type mockStore struct {
 }
 
 // do nothing on create
-func (s *mockStore) SaveURL(shortURL, url string) error {
+func (s *mockStore) SaveURL(db.ShortURL, db.OriginalURL) error {
 	return nil
 }
 
 // return expected data
-func (s *mockStore) RetrieveInitialURL(shortURL string) (string, error) {
+func (s *mockStore) RetrieveInitialURL(db.ShortURL) (db.OriginalURL, error) {
 	// mock not found error
 	if s.expectedData == "" {
 		return "", db.ErrURLNotFound
 	}
-	return s.expectedData, nil
+	return db.OriginalURL(s.expectedData), nil
 }
 
 func TestNewHandlerContext(t *testing.T) {

@@ -25,7 +25,7 @@ func (ctx *handlerContext) HandleShortURLRedirect(w http.ResponseWriter, r *http
 		return
 	}
 
-	url, err := ctx.store.RetrieveInitialURL(shortURL)
+	url, err := ctx.store.RetrieveInitialURL(db.ShortURL(shortURL))
 	if errors.Is(err, db.ErrURLNotFound) {
 		l.Info("requested non-existent URL", zap.String("url", shortURL))
 		http.Error(w, "No such URL: "+shortURL, http.StatusBadRequest)
@@ -33,6 +33,6 @@ func (ctx *handlerContext) HandleShortURLRedirect(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Location", url)
+	w.Header().Set("Location", string(url))
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }

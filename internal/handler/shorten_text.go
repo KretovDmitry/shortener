@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/cfg"
+	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ func (ctx *handlerContext) ShortenText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := ctx.store.SaveURL(shortURL, originalURL); err != nil {
+	if err := ctx.store.SaveURL(db.ShortURL(shortURL), db.OriginalURL(originalURL)); err != nil {
 		l.Error("failed to save URL", zap.Error(err))
 		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 		return

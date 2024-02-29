@@ -24,3 +24,6 @@ vendor/
 
 # Log files
 *.log
+
+# File storage
+*.json

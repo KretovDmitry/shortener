@@ -21,8 +21,10 @@ func Get() *zap.Logger {
 	once.Do(func() {
 		stdout := zapcore.AddSync(os.Stdout)
 
+		tmp := os.TempDir()
+
 		file := zapcore.AddSync(&lumberjack.Logger{
-			Filename:   "logs/app.log",
+			Filename:   tmp + "/shortener/logs/app.log",
 			MaxSize:    5,  // megabytes
 			MaxBackups: 10, // max num of old log files
 			MaxAge:     14, // days

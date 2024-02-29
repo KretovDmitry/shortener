@@ -63,6 +63,8 @@ func main() {
 	}()
 
 	// Run the server
+	l.Info("Server has started", zap.String("addr", cfg.AddrToRun.String()))
+	l.Info("Return address", zap.String("addr", cfg.AddrToReturn.String()))
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		l.Fatal("ListenAndServe failed", zap.Error(err))
@@ -78,7 +80,10 @@ func initService() (http.Handler, error) {
 		return nil, errors.Wrap(err, "parse flags")
 	}
 
-	store := db.NewInMemoryStore()
+	store, err := db.NewInMemoryStore()
+	if err != nil {
+		return nil, errors.Wrap(err, "new in memory store")
+	}
 
 	hctx, err := handler.NewHandlerContext(store)
 	if err != nil {

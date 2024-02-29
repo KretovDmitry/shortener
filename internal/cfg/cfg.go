@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -54,9 +55,47 @@ func (a *netAddress) Set(s string) error {
 	return nil
 }
 
+type fileStorage struct {
+	path     string
+	required bool
+}
+
+func NewFileStorage() *fileStorage {
+	const defaultFileName = "short-url-db.json"
+	tmp := os.TempDir()
+	return &fileStorage{
+		path:     path.Join(tmp, defaultFileName),
+		required: true,
+	}
+}
+
+func (fs *fileStorage) String() string {
+	return fs.path
+}
+
+func (fs *fileStorage) Set(s string) error {
+	if s == "" {
+		fs.required = false
+		return nil
+	}
+
+	fs.path = s
+
+	return nil
+}
+
+func (fs *fileStorage) Path() string {
+	return fs.path
+}
+
+func (fs *fileStorage) Required() bool {
+	return fs.required
+}
+
 var (
 	AddrToRun    = NewNetAddress()
 	AddrToReturn = NewNetAddress()
+	FileStorage  = NewFileStorage()
 	LogLevel     string
 )
 
@@ -64,6 +103,7 @@ func ParseFlags() error {
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
+	flag.Var(FileStorage, "f", "file storage path")
 	flag.StringVar(&LogLevel, "l", "info", "log level")
 	flag.Parse()
 
@@ -80,6 +120,12 @@ func ParseFlags() error {
 		if err != nil {
 			return errors.Wrap(err, "invalid BASE_URL")
 		}
+	}
+
+	envFileStoragePath, set := os.LookupEnv("FILE_STORAGE_PATH")
+	if set {
+		err := FileStorage.Set(envFileStoragePath)
+		return errors.Wrap(err, "invalid FILE_STORAGE_PATH")
 	}
 
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {

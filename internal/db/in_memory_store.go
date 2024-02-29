@@ -2,44 +2,15 @@ package db
 
 import (
 	"sync"
-
-	"github.com/KretovDmitry/shortener/internal/cfg"
-	"github.com/pkg/errors"
 )
 
-var ErrURLNotFound = errors.New("URL not found")
-
 type inMemoryStore struct {
-	mu         sync.RWMutex
-	store      map[ShortURL]OriginalURL
-	fileWriter *Producer
+	mu    sync.RWMutex
+	store map[ShortURL]OriginalURL
 }
 
-func NewInMemoryStore() (*inMemoryStore, error) {
-	store := make(map[ShortURL]OriginalURL)
-	var producer *Producer
-
-	consumer, err := NewConsumer(cfg.FileStorage.Path())
-	if err != nil {
-		return nil, errors.Wrap(err, "new consumer")
-	}
-
-	err = consumer.ReadAll(store)
-	if err != nil {
-		return nil, errors.Wrap(err, "read all")
-	}
-
-	if cfg.FileStorage.Required() {
-		producer, err = NewProducer(cfg.FileStorage.Path())
-		if err != nil {
-			return nil, errors.Wrap(err, "new producer")
-		}
-	}
-
-	return &inMemoryStore{
-		store:      store,
-		fileWriter: producer,
-	}, nil
+func NewInMemoryStore() *inMemoryStore {
+	return &inMemoryStore{store: make(map[ShortURL]OriginalURL)}
 }
 
 func (s *inMemoryStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
@@ -56,22 +27,8 @@ func (s *inMemoryStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
 
 func (s *inMemoryStore) SaveURL(sURL ShortURL, url OriginalURL) error {
 	s.mu.Lock()
-	_, found := s.store[sURL]
-	if !found {
-		s.store[sURL] = url
-	}
+	s.store[sURL] = url
 	s.mu.Unlock()
-
-	if !found && cfg.FileStorage.Required() {
-		record := &Record{
-			ShortURL:    sURL,
-			OriginalURL: url,
-		}
-		err := s.fileWriter.WriteRecord(record)
-		if err != nil {
-			return errors.Wrap(err, "write record")
-		}
-	}
 
 	return nil
 }

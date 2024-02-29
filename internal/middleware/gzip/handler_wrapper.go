@@ -138,8 +138,8 @@ func (h *Handler) putWriteWrapper(w *writerWrapper) {
 }
 
 // WrapHandler wraps a http.Handler, returning its gzip-enabled version
-func (h *Handler) WrapHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) WrapHandler(next http.HandlerFunc) http.HandlerFunc {
+	return (func(w http.ResponseWriter, r *http.Request) {
 		var shouldCompress = true
 
 		for _, filter := range h.requestFilter {
@@ -160,6 +160,6 @@ func (h *Handler) WrapHandler(next http.Handler) http.Handler {
 			}()
 		}
 
-		next.ServeHTTP(w, r)
+		next(w, r)
 	})
 }

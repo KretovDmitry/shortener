@@ -26,7 +26,7 @@ func main() {
 
 	mux, err := initService()
 	if err != nil {
-		l.Fatal("initService failed", zap.Error(err))
+		l.Fatal("init service failed", zap.Error(err))
 	}
 
 	server := &http.Server{
@@ -80,9 +80,9 @@ func initService() (http.Handler, error) {
 		return nil, errors.Wrap(err, "parse flags")
 	}
 
-	store, err := db.NewInMemoryStore()
+	store, err := db.NewFileStore(cfg.FileStorage.Path())
 	if err != nil {
-		return nil, errors.Wrap(err, "new in memory store")
+		return nil, errors.Wrap(err, "new store")
 	}
 
 	hctx, err := handler.NewHandlerContext(store)
@@ -93,6 +93,7 @@ func initService() (http.Handler, error) {
 	r := chi.NewRouter()
 
 	chain := middleware.BuildChain(
+		gzip.DefaultHandler().WrapHandler,
 		middleware.RequestLogger,
 		gzip.Unzip,
 	)
@@ -101,5 +102,5 @@ func initService() (http.Handler, error) {
 	r.Get("/{shortURL}", chain(hctx.HandleShortURLRedirect))
 	r.Post("/api/shorten", chain(hctx.ShortenJSON))
 
-	return gzip.DefaultHandler().WrapHandler(r), nil
+	return r, nil
 }

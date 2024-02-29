@@ -16,11 +16,11 @@ import (
 
 const handlerTestSize = 256
 
-func newHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+func newHTTPInstance(payload []byte, wrapper ...func(next http.HandlerFunc) http.HandlerFunc) http.HandlerFunc {
+	var handler http.HandlerFunc = func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		_, _ = w.Write(payload)
-	})
+	}
 
 	for _, wrap := range wrapper {
 		handler = wrap(handler)
@@ -29,8 +29,8 @@ func newHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Han
 	return handler
 }
 
-func newEchoHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http.Handler) http.Handler {
-	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func newEchoHTTPInstance(payload []byte, wrapper ...func(next http.HandlerFunc) http.HandlerFunc) http.HandlerFunc {
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 
 		var buf bytes.Buffer
@@ -38,7 +38,7 @@ func newEchoHTTPInstance(payload []byte, wrapper ...func(next http.Handler) http
 		_, _ = io.Copy(&buf, r.Body)
 		_, _ = buf.Write(payload)
 		_, _ = w.Write(buf.Bytes())
-	})
+	}
 
 	for _, wrap := range wrapper {
 		handler = wrap(handler)
@@ -114,7 +114,7 @@ func TestHTTPWithDefaultHandler_404(t *testing.T) {
 	)
 
 	mux := http.NewServeMux()
-	mux.Handle("/somewhere", g)
+	mux.HandleFunc("/somewhere", g)
 
 	r.Header.Set("Accept-Encoding", "gzip")
 
@@ -176,11 +176,11 @@ func TestHTTPWithDefaultHandler(t *testing.T) {
 
 func TestHTTPWithDefaultHandler_TinyPayload_WriteTwice(t *testing.T) {
 	var (
-		handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		handler http.HandlerFunc = func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf8")
 			_, _ = io.WriteString(w, "part 1\n")
 			_, _ = io.WriteString(w, "part 2\n")
-		})
+		}
 		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = httptest.NewRecorder()
 	)
@@ -201,12 +201,12 @@ func TestHTTPWithDefaultHandler_TinyPayload_WriteTwice(t *testing.T) {
 
 func TestHTTPWithDefaultHandler_TinyPayload_WriteThreeTimes(t *testing.T) {
 	var (
-		handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		handler http.HandlerFunc = func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf8")
 			_, _ = io.WriteString(w, "part 1\n")
 			_, _ = io.WriteString(w, "part 2\n")
 			_, _ = io.WriteString(w, "part 3\n")
-		})
+		}
 		r = httptest.NewRequest(http.MethodPost, "/", nil)
 		w = httptest.NewRecorder()
 	)

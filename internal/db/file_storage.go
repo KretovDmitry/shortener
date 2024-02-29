@@ -5,10 +5,11 @@ import (
 	"io"
 	"os"
 
+	"github.com/KretovDmitry/shortener/internal/cfg"
 	"github.com/pkg/errors"
 )
 
-type Record struct {
+type FileRecord struct {
 	ShortURL    ShortURL    `json:"short_url"`
 	OriginalURL OriginalURL `json:"original_url"`
 }
@@ -30,7 +31,7 @@ func NewProducer(fileName string) (*Producer, error) {
 	}, nil
 }
 
-func (p *Producer) WriteRecord(record *Record) error {
+func (p *Producer) WriteRecord(record *FileRecord) error {
 	return p.encoder.Encode(&record)
 }
 
@@ -51,8 +52,8 @@ func NewConsumer(fileName string) (*Consumer, error) {
 	}, nil
 }
 
-func (c *Consumer) ReadRecord() (*Record, error) {
-	record := &Record{}
+func (c *Consumer) ReadRecord() (*FileRecord, error) {
+	record := &FileRecord{}
 	if err := c.decoder.Decode(&record); err != nil {
 		return nil, err
 	}
@@ -60,19 +61,69 @@ func (c *Consumer) ReadRecord() (*Record, error) {
 	return record, nil
 }
 
-func (c *Consumer) ReadAll(store map[ShortURL]OriginalURL) error {
+type fileStore struct {
+	cache *inMemoryStore
+	file  *Producer
+}
+
+func NewFileStore(filepath string) (*fileStore, error) {
+	fileStore := &fileStore{
+		cache: NewInMemoryStore(),
+		file:  nil,
+	}
+
+	consumer, err := NewConsumer(filepath)
+	if err != nil {
+		return nil, errors.Wrap(err, "new consumer")
+	}
+
 	for {
-		record, err := c.ReadRecord()
+		record, err := consumer.ReadRecord()
 		if record != nil {
-			store[record.ShortURL] = record.OriginalURL
+			fileStore.cache.SaveURL(record.ShortURL, record.OriginalURL)
 		}
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return errors.Wrap(err, "read record")
+			return nil, errors.Wrap(err, "read record")
 		}
 	}
 
-	return nil
+	if !cfg.FileStorage.WriteRequired() {
+		return fileStore, nil
+	}
+
+	producer, err := NewProducer(filepath)
+	if err != nil {
+		return nil, errors.Wrap(err, "new producer")
+	}
+
+	fileStore.file = producer
+
+	return fileStore, nil
+}
+
+func (fs *fileStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
+	return fs.cache.RetrieveInitialURL(sURL)
+}
+
+func (fs *fileStore) SaveURL(sURL ShortURL, url OriginalURL) error {
+	_, err := fs.cache.RetrieveInitialURL(sURL)
+	if err != nil && err != ErrURLNotFound {
+		return err
+	}
+
+	fs.cache.SaveURL(sURL, url)
+
+	if !cfg.FileStorage.WriteRequired() {
+		return nil
+	}
+
+	record := &FileRecord{
+		ShortURL:    sURL,
+		OriginalURL: url,
+	}
+
+	return fs.file.WriteRecord(record)
 }

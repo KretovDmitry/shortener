@@ -56,16 +56,16 @@ func (a *netAddress) Set(s string) error {
 }
 
 type fileStorage struct {
-	path     string
-	required bool
+	path          string
+	writeRequired bool
 }
 
 func NewFileStorage() *fileStorage {
 	const defaultFileName = "short-url-db.json"
 	tmp := os.TempDir()
 	return &fileStorage{
-		path:     path.Join(tmp, defaultFileName),
-		required: true,
+		path:          path.Join(tmp, defaultFileName),
+		writeRequired: true,
 	}
 }
 
@@ -75,7 +75,7 @@ func (fs *fileStorage) String() string {
 
 func (fs *fileStorage) Set(s string) error {
 	if s == "" {
-		fs.required = false
+		fs.writeRequired = false
 		return nil
 	}
 
@@ -88,8 +88,8 @@ func (fs *fileStorage) Path() string {
 	return fs.path
 }
 
-func (fs *fileStorage) Required() bool {
-	return fs.required
+func (fs *fileStorage) WriteRequired() bool {
+	return fs.writeRequired
 }
 
 var (
@@ -122,10 +122,11 @@ func ParseFlags() error {
 		}
 	}
 
-	envFileStoragePath, set := os.LookupEnv("FILE_STORAGE_PATH")
-	if set {
+	if envFileStoragePath, set := os.LookupEnv("FILE_STORAGE_PATH"); set {
 		err := FileStorage.Set(envFileStoragePath)
-		return errors.Wrap(err, "invalid FILE_STORAGE_PATH")
+		if err != nil {
+			return errors.Wrap(err, "invalid FILE_STORAGE_PATH")
+		}
 	}
 
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {

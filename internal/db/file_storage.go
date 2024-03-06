@@ -2,11 +2,12 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/KretovDmitry/shortener/internal/cfg"
-	"github.com/pkg/errors"
 )
 
 type FileRecord struct {
@@ -74,7 +75,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 
 	consumer, err := NewConsumer(filepath)
 	if err != nil {
-		return nil, errors.Wrap(err, "new consumer")
+		return nil, fmt.Errorf("new consumer: %w", err)
 	}
 
 	for {
@@ -86,7 +87,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 			break
 		}
 		if err != nil {
-			return nil, errors.Wrap(err, "read record")
+			return nil, fmt.Errorf("read record: %w", err)
 		}
 	}
 
@@ -96,7 +97,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 
 	producer, err := NewProducer(filepath)
 	if err != nil {
-		return nil, errors.Wrap(err, "new producer")
+		return nil, fmt.Errorf("new producer: %w", err)
 	}
 
 	fileStore.file = producer
@@ -109,15 +110,17 @@ func (fs *fileStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
 }
 
 func (fs *fileStore) SaveURL(sURL ShortURL, url OriginalURL) error {
-	savedURL, _ := fs.cache.RetrieveInitialURL(sURL)
+	savedURL, err := fs.cache.RetrieveInitialURL(sURL)
+	if err != nil && !errors.Is(err, ErrURLNotFound) {
+		return err
+	}
+
 	if savedURL == url {
 		return nil
 	}
 
-	fs.cache.SaveURL(sURL, url)
-
 	if !cfg.FileStorage.WriteRequired() {
-		return nil
+		return fs.cache.SaveURL(sURL, url)
 	}
 
 	record := &FileRecord{
@@ -125,5 +128,9 @@ func (fs *fileStore) SaveURL(sURL ShortURL, url OriginalURL) error {
 		OriginalURL: url,
 	}
 
-	return fs.file.WriteRecord(record)
+	if err := fs.file.WriteRecord(record); err != nil {
+		return fmt.Errorf("write record: %w", err)
+	}
+
+	return fs.cache.SaveURL(sURL, url)
 }

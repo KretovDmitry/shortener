@@ -1,14 +1,13 @@
 package cfg
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -111,21 +110,21 @@ func ParseFlags() error {
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
 		err := AddrToRun.Set(envRunAddr)
 		if err != nil {
-			return errors.Wrap(err, "invalid SERVER_ADDRESS")
+			return fmt.Errorf("invalid SERVER_ADDRESS: %w", err)
 		}
 	}
 
 	if envReturnAddr := os.Getenv("BASE_URL"); envReturnAddr != "" {
 		err := AddrToReturn.Set(envReturnAddr)
 		if err != nil {
-			return errors.Wrap(err, "invalid BASE_URL")
+			return fmt.Errorf("invalid BASE_URL: %w", err)
 		}
 	}
 
 	if envFileStoragePath, set := os.LookupEnv("FILE_STORAGE_PATH"); set {
 		err := FileStorage.Set(envFileStoragePath)
 		if err != nil {
-			return errors.Wrap(err, "invalid FILE_STORAGE_PATH")
+			return fmt.Errorf("invalid FILE_STORAGE_PATH: %w", err)
 		}
 	}
 

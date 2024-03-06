@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -19,7 +20,7 @@ func (s *inMemoryStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
 
 	url, found := s.store[sURL]
 	if !found {
-		return "", ErrURLNotFound
+		return "", fmt.Errorf("%w: %s", ErrURLNotFound, sURL)
 	}
 
 	return url, nil

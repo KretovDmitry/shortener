@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 	tests := []struct {
 		name     string
 		shortURL string
-		store    db.Storage
+		store    URLStore
 		want     func(res *http.Response)
 	}{
 		{

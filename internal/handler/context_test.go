@@ -18,7 +18,7 @@ const (
 	applicationJSON = "application/json"
 )
 
-// mokeStore must implement db.Storage interface
+// mokeStore must implement URLStore interface
 type mockStore struct {
 	expectedData string
 }
@@ -41,7 +41,7 @@ func TestNewHandlerContext(t *testing.T) {
 	emptyMockStore := &mockStore{expectedData: ""}
 
 	type args struct {
-		store db.Storage
+		store URLStore
 	}
 	tests := []struct {
 		name    string

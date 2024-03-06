@@ -32,7 +32,8 @@ func (ctx *handlerContext) ShortenText(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		l.Error("failed to read request body", zap.Error(err))
-		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
+		msg := fmt.Sprintf("Internal server error: %s", err)
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 	r.Body.Close()
@@ -47,13 +48,15 @@ func (ctx *handlerContext) ShortenText(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := shorturl.Generate(originalURL)
 	if err != nil {
 		l.Error("failed to generate short URL", zap.Error(err))
-		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
+		msg := fmt.Sprintf("Internal server error: %s", err)
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 
 	if err := ctx.store.SaveURL(db.ShortURL(shortURL), db.OriginalURL(originalURL)); err != nil {
 		l.Error("failed to save URL", zap.Error(err))
-		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
+		msg := fmt.Sprintf("Internal server error: %s", err)
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 

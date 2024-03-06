@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/itchyny/base58-go"
-	"github.com/pkg/errors"
 )
 
 // sha256of hashes the initial input using standard sha256 hash function
@@ -33,7 +32,7 @@ func Generate(initialLink string) (string, error) {
 	generatedNumber := new(big.Int).SetBytes(urlHashBytes).Uint64()
 	finalString, err := base58Encoded([]byte(fmt.Sprintf("%d", generatedNumber)))
 	if err != nil {
-		return "", errors.Wrap(err, "failed to generate short link")
+		return "", fmt.Errorf("failed to generate short link: %w", err)
 	}
 	return finalString[:8], nil
 }

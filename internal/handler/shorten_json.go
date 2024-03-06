@@ -14,11 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
-type shortenJSONRequestPayload struct {
-	URL string `json:"url"`
-}
-
 type (
+	shortenJSONRequestPayload struct {
+		URL string `json:"url"`
+	}
+
 	shortURL string
 
 	shortenJSONResponsePayload struct {
@@ -108,7 +108,7 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	if err := encoder.Encode(result); err != nil {
 		l.Error("failed encode response JSON body", zap.Error(err))
 		msg := fmt.Sprintf(
-			"Couldn't encode request JSON body: %s", err,
+			"Couldn't encode response JSON body: %s", err,
 		)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return

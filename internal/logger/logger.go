@@ -15,8 +15,6 @@ import (
 
 var once sync.Once
 
-var logger *zap.Logger
-
 func Get() *zap.Logger {
 	once.Do(func() {
 		stdout := zapcore.AddSync(os.Stdout)
@@ -75,8 +73,8 @@ func Get() *zap.Logger {
 				),
 		)
 
-		logger = zap.New(core)
+		zap.ReplaceGlobals(zap.New(core))
 	})
 
-	return logger
+	return zap.L()
 }

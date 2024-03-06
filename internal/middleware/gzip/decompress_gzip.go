@@ -2,12 +2,12 @@ package gzip
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/logger"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +21,7 @@ type compressReader struct {
 func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "new gzip reader")
+		return nil, fmt.Errorf("new gzip reader: %w", err)
 	}
 
 	return &compressReader{
@@ -36,7 +36,7 @@ func (c compressReader) Read(p []byte) (n int, err error) {
 
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
-		return errors.Wrap(err, "close failed")
+		return fmt.Errorf("close failed: %w", err)
 	}
 	return c.zr.Close()
 }

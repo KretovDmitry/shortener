@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,7 +16,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/KretovDmitry/shortener/internal/middleware/gzip"
 	"github.com/go-chi/chi/v5"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -37,32 +36,18 @@ func main() {
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
-	// Listen for syscall signals for process to interrupt/quit
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 	go func() {
 		<-sig
 
-		// Shutdown signal with grace period of 30 seconds
-		shutdownCtx, shutdownStopCtx := context.WithTimeout(serverCtx, 30*time.Second)
-
-		go func() {
-			<-shutdownCtx.Done()
-			if shutdownCtx.Err() == context.DeadlineExceeded {
-				log.Fatal("graceful shutdown timed out.. forcing exit")
-			}
-			shutdownStopCtx()
-		}()
-
-		// Trigger graceful shutdown
-		err := server.Shutdown(shutdownCtx)
+		err := server.Shutdown(serverCtx)
 		if err != nil {
 			l.Fatal("graceful shutdown failed", zap.Error(err))
 		}
 		serverStopCtx()
 	}()
 
-	// Run the server
 	l.Info("Server has started", zap.String("addr", cfg.AddrToRun.String()))
 	l.Info("Return address", zap.String("addr", cfg.AddrToReturn.String()))
 	err = server.ListenAndServe()
@@ -71,23 +56,27 @@ func main() {
 	}
 
 	// Wait for server context to be stopped
-	<-serverCtx.Done()
+	select {
+	case <-serverCtx.Done():
+	case <-time.After(30 * time.Second):
+		l.Fatal("graceful shutdown timed out.. forcing exit")
+	}
 }
 
 func initService() (http.Handler, error) {
 	err := cfg.ParseFlags()
 	if err != nil {
-		return nil, errors.Wrap(err, "parse flags")
+		return nil, fmt.Errorf("parse flags: %w", err)
 	}
 
 	store, err := db.NewFileStore(cfg.FileStorage.Path())
 	if err != nil {
-		return nil, errors.Wrap(err, "new store")
+		return nil, fmt.Errorf("new store: %w", err)
 	}
 
 	hctx, err := handler.NewHandlerContext(store)
 	if err != nil {
-		return nil, errors.Wrap(err, "new handler context")
+		return nil, fmt.Errorf("new handler context: %w", err)
 	}
 
 	r := chi.NewRouter()

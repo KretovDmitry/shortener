@@ -1,7 +1,10 @@
-// Package db is responsible for storing original and short URLs.
 package db
 
-type Storage interface {
-	RetrieveInitialURL(key string) (url string, err error)
-	SaveURL(shortURL, url string) error
-}
+import "github.com/pkg/errors"
+
+type (
+	ShortURL    string
+	OriginalURL string
+)
+
+var ErrURLNotFound = errors.New("URL not found")

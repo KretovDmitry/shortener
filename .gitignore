@@ -21,3 +21,9 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# Log files
+*.log
+
+# File storage
+*.json

@@ -1,35 +1,35 @@
 package db
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 )
 
-var ErrURLNotFound = errors.New("URL not found")
-
 type inMemoryStore struct {
 	mu    sync.RWMutex
-	store map[string]string
+	store map[ShortURL]OriginalURL
 }
 
-func NewInMemoryStore() Storage {
-	var store Storage = &inMemoryStore{store: make(map[string]string)}
-	return store
+func NewInMemoryStore() *inMemoryStore {
+	return &inMemoryStore{store: make(map[ShortURL]OriginalURL)}
 }
 
-func (s *inMemoryStore) RetrieveInitialURL(key string) (string, error) {
+func (s *inMemoryStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	url, found := s.store[key]
+
+	url, found := s.store[sURL]
 	if !found {
-		return "", ErrURLNotFound
+		return "", fmt.Errorf("%w: %s", ErrURLNotFound, sURL)
 	}
+
 	return url, nil
 }
 
-func (s *inMemoryStore) SaveURL(shortURL, url string) error {
+func (s *inMemoryStore) SaveURL(sURL ShortURL, url OriginalURL) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.store[shortURL] = url
+	s.store[sURL] = url
+	s.mu.Unlock()
+
 	return nil
 }

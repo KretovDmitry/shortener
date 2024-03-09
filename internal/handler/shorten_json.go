@@ -6,9 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/KretovDmitry/shortener/internal/cfg"
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -27,17 +26,16 @@ type (
 )
 
 func (s shortURL) MarshalJSON() ([]byte, error) {
-	result := fmt.Sprintf("http://%s/%s", cfg.AddrToReturn, s)
+	result := fmt.Sprintf("http://%s/%s", config.AddrToReturn, s)
 	return json.Marshal(result)
 }
 
-func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
-	l := logger.Get()
-	defer l.Sync()
+func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
+	defer h.logger.Sync()
 
 	// guard in case of future router switching
 	if r.Method != http.MethodPost {
-		l.Info("got request with bad method", zap.String("method", r.Method))
+		h.logger.Info("got request with bad method", zap.String("method", r.Method))
 		msg := `Only POST method is allowed`
 		http.Error(w, msg, http.StatusBadRequest)
 		return
@@ -45,7 +43,7 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
 	if contentType != "application/json" {
-		l.Info(
+		h.logger.Info(
 			"got request with bad content-type",
 			zap.String("content-type", r.Header.Get("Content-Type")),
 		)
@@ -60,7 +58,7 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if err := decoder.Decode(&payload); err != nil {
-		l.Error("failed decode request JSON body", zap.Error(err))
+		h.logger.Error("failed decode request JSON body", zap.Error(err))
 		msg := fmt.Sprintf(
 			"Couldn't decode request JSON body: %s", err,
 		)
@@ -84,14 +82,14 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	sURL, err := shorturl.Generate(payload.URL)
 	if err != nil {
-		l.Error("failed generate short URL", zap.Error(err))
+		h.logger.Error("failed generate short URL", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 
-	if err := ctx.store.SaveURL(db.ShortURL(sURL), db.OriginalURL(payload.URL)); err != nil {
-		l.Error("failed save URLs", zap.Error(err))
+	if err := h.store.SaveURL(db.ShortURL(sURL), db.OriginalURL(payload.URL)); err != nil {
+		h.logger.Error("failed save URLs", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
@@ -106,7 +104,7 @@ func (ctx *handlerContext) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	if err := encoder.Encode(result); err != nil {
-		l.Error("failed encode response JSON body", zap.Error(err))
+		h.logger.Error("failed encode response JSON body", zap.Error(err))
 		msg := fmt.Sprintf(
 			"Couldn't encode response JSON body: %s", err,
 		)

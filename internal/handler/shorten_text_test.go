@@ -86,7 +86,7 @@ func TestShortenText(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := NewHandlerContext(emptyMockStore)
+			hctx, err := New(emptyMockStore, nil)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

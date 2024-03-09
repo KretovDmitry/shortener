@@ -7,7 +7,7 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/KretovDmitry/shortener/internal/cfg"
+	"github.com/KretovDmitry/shortener/internal/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -28,7 +28,7 @@ func Get() *zap.Logger {
 		})
 
 		level := zap.InfoLevel
-		levelFromEnv, err := zapcore.ParseLevel(cfg.LogLevel)
+		levelFromEnv, err := zapcore.ParseLevel(config.LogLevel)
 		if err != nil {
 			log.Println(
 				fmt.Errorf("invalid level, defaulting to INFO: %w", err),

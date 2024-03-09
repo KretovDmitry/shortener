@@ -6,28 +6,26 @@ import (
 	"regexp"
 
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
 
 var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]{8}$`)
 
-func (ctx *handlerContext) HandleShortURLRedirect(w http.ResponseWriter, r *http.Request) {
-	l := logger.Get()
-	defer l.Sync()
+func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
+	defer h.logger.Sync()
 
 	shortURL := chi.URLParam(r, "shortURL")
 
 	if !Base58Regexp.MatchString(shortURL) {
-		l.Info("requested invalid URL", zap.String("url", shortURL))
+		h.logger.Info("requested invalid URL", zap.String("url", shortURL))
 		http.Error(w, "Invalid URL: "+shortURL, http.StatusBadRequest)
 		return
 	}
 
-	url, err := ctx.store.RetrieveInitialURL(db.ShortURL(shortURL))
+	url, err := h.store.RetrieveInitialURL(db.ShortURL(shortURL))
 	if errors.Is(err, db.ErrURLNotFound) {
-		l.Info("requested non-existent URL", zap.String("url", shortURL))
+		h.logger.Info("requested non-existent URL", zap.String("url", shortURL))
 		http.Error(w, "No such URL: "+shortURL, http.StatusBadRequest)
 		return
 	}

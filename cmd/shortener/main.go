@@ -9,12 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/KretovDmitry/shortener/internal/cfg"
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
-	"github.com/KretovDmitry/shortener/internal/middleware/gzip"
+	"github.com/KretovDmitry/shortener/pkg/client/postgresql"
+	"github.com/KretovDmitry/shortener/pkg/gzip"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -23,18 +24,18 @@ func main() {
 	l := logger.Get()
 	defer l.Sync()
 
-	mux, err := initService()
+	// Server run context
+	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	mux, err := initService(serverCtx)
 	if err != nil {
 		l.Fatal("init service failed", zap.Error(err))
 	}
 
 	server := &http.Server{
-		Addr:    cfg.AddrToRun.String(),
+		Addr:    config.AddrToRun.String(),
 		Handler: mux,
 	}
-
-	// Server run context
-	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
@@ -48,8 +49,8 @@ func main() {
 		serverStopCtx()
 	}()
 
-	l.Info("Server has started", zap.String("addr", cfg.AddrToRun.String()))
-	l.Info("Return address", zap.String("addr", cfg.AddrToReturn.String()))
+	l.Info("Server has started", zap.String("addr", config.AddrToRun.String()))
+	l.Info("Return address", zap.String("addr", config.AddrToReturn.String()))
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		l.Fatal("ListenAndServe failed", zap.Error(err))
@@ -63,18 +64,23 @@ func main() {
 	}
 }
 
-func initService() (http.Handler, error) {
-	err := cfg.ParseFlags()
+func initService(ctx context.Context) (http.Handler, error) {
+	err := config.ParseFlags()
 	if err != nil {
 		return nil, fmt.Errorf("parse flags: %w", err)
 	}
 
-	store, err := db.NewFileStore(cfg.FileStorage.Path())
+	store, err := db.NewFileStore(config.FileStorage.Path())
 	if err != nil {
-		return nil, fmt.Errorf("new store: %w", err)
+		return nil, fmt.Errorf("new file store: %w", err)
 	}
 
-	hctx, err := handler.NewHandlerContext(store)
+	postgreSQLClient, err := postgresql.NewClient(ctx, 3, config.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("new postgresql client: %w", err)
+	}
+
+	handler, err := handler.New(store, postgreSQLClient)
 	if err != nil {
 		return nil, fmt.Errorf("new handler context: %w", err)
 	}
@@ -87,9 +93,10 @@ func initService() (http.Handler, error) {
 		gzip.Unzip,
 	)
 
-	r.Post("/", chain(hctx.ShortenText))
-	r.Get("/{shortURL}", chain(hctx.HandleShortURLRedirect))
-	r.Post("/api/shorten", chain(hctx.ShortenJSON))
+	r.Post("/", chain(handler.ShortenText))
+	r.Post("/api/shorten", chain(handler.ShortenJSON))
+	r.Get("/{shortURL}", chain(handler.Redirect))
+	r.Get("/ping", handler.PingDB)
 
 	return r, nil
 }

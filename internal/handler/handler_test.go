@@ -3,7 +3,6 @@ package handler
 import (
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -79,7 +78,7 @@ func TestNew(t *testing.T) {
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !assert.Equal(t, got, tt.want) {
 				t.Errorf("got = %v, want %v", got, tt.want)
 			}
 		})

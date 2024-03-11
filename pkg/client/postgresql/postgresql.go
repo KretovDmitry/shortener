@@ -25,14 +25,14 @@ func NewClient(ctx context.Context, maxAttempts int, dsn string) (pool *pgxpool.
 		defer cancel()
 
 		if pool, err = pgxpool.New(ctx, dsn); err != nil {
-			return fmt.Errorf("unable to create connection pool: %v", err)
+			return fmt.Errorf("unable to create connection pool: %w", err)
 		}
 
 		return nil
 	}, maxAttempts, 5*time.Second)
 
 	if err != nil {
-		return nil, fmt.Errorf("new postgresql client: %v", err)
+		return nil, fmt.Errorf("new postgresql client: %w", err)
 	}
 
 	return

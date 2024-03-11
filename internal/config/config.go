@@ -15,22 +15,6 @@ const (
 	defaultPort = 8080
 )
 
-// # Example URL
-// postgres://jack:secret@pg.example.com:5432/mydb?sslmode=verify-ca&pool_max_conns=10
-//
-// # Example DSN
-// user=jack password=secret host=pg.example.com port=5432 dbname=mydb
-var (
-	defaultDSN = fmt.Sprintf(
-		"user=%s password=%s host=%s port=%s dbname=%s",
-		os.Getenv("PGUSER"),
-		os.Getenv("PGPASSWORD"),
-		os.Getenv("PGHOST"),
-		os.Getenv("PGPORT"),
-		os.Getenv("PGDATABASE"),
-	)
-)
-
 type netAddress struct {
 	Host string
 	Port int
@@ -120,7 +104,7 @@ func ParseFlags() error {
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
 	flag.Var(FileStorage, "f", "File storage path")
-	flag.StringVar(&DSN, "d", defaultDSN, "Data source name in form postgres URL or DSN string")
+	flag.StringVar(&DSN, "d", "", "Data source name in form postgres URL or DSN string")
 	flag.StringVar(&LogLevel, "l", "info", "Log level")
 	flag.Parse()
 

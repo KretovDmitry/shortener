@@ -98,7 +98,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store, nil)
+			hctx, err := New(tt.store)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

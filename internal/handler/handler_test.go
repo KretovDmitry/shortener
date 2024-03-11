@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -24,25 +25,27 @@ type mockStore struct {
 }
 
 // do nothing on create
-func (s *mockStore) SaveURL(db.ShortURL, db.OriginalURL) error {
+func (s *mockStore) SaveURL(context.Context, *db.URLRecord) error {
 	return nil
 }
 
 // return expected data
-func (s *mockStore) RetrieveInitialURL(db.ShortURL) (db.OriginalURL, error) {
+func (s *mockStore) RetrieveInitialURL(context.Context, db.ShortURL) (db.OriginalURL, error) {
 	// mock not found error
 	if s.expectedData == "" {
 		return "", db.ErrURLNotFound
 	}
 	return db.OriginalURL(s.expectedData), nil
 }
+func (s *mockStore) Ping(context.Context) error {
+	return nil
+}
 
 func TestNew(t *testing.T) {
 	emptyMockStore := &mockStore{expectedData: ""}
 
 	type args struct {
-		store    db.Store
-		sqlStore db.Store
+		store db.Store
 	}
 	tests := []struct {
 		name    string
@@ -53,8 +56,7 @@ func TestNew(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				store:    emptyMockStore,
-				sqlStore: emptyMockStore,
+				store: emptyMockStore,
 			},
 			want: &handler{
 				store:  emptyMockStore,
@@ -65,8 +67,7 @@ func TestNew(t *testing.T) {
 		{
 			name: "negative test #1: nil store",
 			args: args{
-				store:    nil,
-				sqlStore: emptyMockStore,
+				store: nil,
 			},
 			want:    nil,
 			wantErr: true,
@@ -74,7 +75,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := New(tt.args.store, nil)
+			got, err := New(tt.args.store)
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}

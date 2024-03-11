@@ -135,7 +135,7 @@ func TestShortenJSON(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(emptyMockStore, nil)
+			hctx, err := New(emptyMockStore)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

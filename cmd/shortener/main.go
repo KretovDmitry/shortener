@@ -13,9 +13,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
-	"github.com/KretovDmitry/shortener/internal/middleware"
-	"github.com/KretovDmitry/shortener/pkg/client/postgresql"
-	"github.com/KretovDmitry/shortener/pkg/gzip"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -70,33 +67,18 @@ func initService(ctx context.Context) (http.Handler, error) {
 		return nil, fmt.Errorf("parse flags: %w", err)
 	}
 
-	store, err := db.NewFileStore(config.FileStorage.Path())
+	store, err := db.NewStore(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("new file store: %w", err)
+		return nil, fmt.Errorf("new store: %w", err)
 	}
 
-	postgreSQLClient, err := postgresql.NewClient(ctx, 3, config.DSN)
-	if err != nil {
-		return nil, fmt.Errorf("new postgresql client: %w", err)
-	}
-
-	handler, err := handler.New(store, postgreSQLClient)
+	handler, err := handler.New(store)
 	if err != nil {
 		return nil, fmt.Errorf("new handler context: %w", err)
 	}
 
 	r := chi.NewRouter()
-
-	chain := middleware.BuildChain(
-		gzip.DefaultHandler().WrapHandler,
-		middleware.RequestLogger,
-		gzip.Unzip,
-	)
-
-	r.Post("/", chain(handler.ShortenText))
-	r.Post("/api/shorten", chain(handler.ShortenJSON))
-	r.Get("/{shortURL}", chain(handler.Redirect))
-	r.Get("/ping", handler.PingDB)
+	handler.Register(r)
 
 	return r, nil
 }

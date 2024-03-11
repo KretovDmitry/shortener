@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 
@@ -23,10 +24,15 @@ func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := h.store.RetrieveInitialURL(db.ShortURL(shortURL))
-	if errors.Is(err, db.ErrURLNotFound) {
-		h.logger.Info("requested non-existent URL", zap.String("url", shortURL))
-		http.Error(w, "No such URL: "+shortURL, http.StatusBadRequest)
+	url, err := h.store.RetrieveInitialURL(r.Context(), db.ShortURL(shortURL))
+	if err != nil {
+		if errors.Is(err, db.ErrURLNotFound) {
+			h.logger.Info("requested non-existent URL", zap.String("url", shortURL))
+			http.Error(w, "No such URL: "+shortURL, http.StatusBadRequest)
+			return
+		}
+		h.logger.Error("failed to retrieve initial URL", zap.Error(err))
+		http.Error(w, fmt.Sprintf("Internal server error: %s", err), http.StatusInternalServerError)
 		return
 	}
 

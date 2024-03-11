@@ -80,7 +80,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sURL, err := shorturl.Generate(payload.URL)
+	generatedShortURL, err := shorturl.Generate(payload.URL)
 	if err != nil {
 		h.logger.Error("failed generate short URL", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
@@ -88,7 +88,9 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SaveURL(db.ShortURL(sURL), db.OriginalURL(payload.URL)); err != nil {
+	newRecord := db.NewRecord(generatedShortURL, payload.URL)
+
+	if err := h.store.SaveURL(r.Context(), newRecord); err != nil {
 		h.logger.Error("failed save URLs", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		http.Error(w, msg, http.StatusInternalServerError)
@@ -96,7 +98,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := shortenJSONResponsePayload{
-		Result: shortURL(sURL),
+		Result: shortURL(generatedShortURL),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

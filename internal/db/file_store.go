@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,12 +9,8 @@ import (
 	"os"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/google/uuid"
 )
-
-type FileRecord struct {
-	ShortURL    ShortURL    `json:"short_url"`
-	OriginalURL OriginalURL `json:"original_url"`
-}
 
 type Producer struct {
 	file    *os.File
@@ -32,7 +29,7 @@ func NewProducer(fileName string) (*Producer, error) {
 	}, nil
 }
 
-func (p *Producer) WriteRecord(record *FileRecord) error {
+func (p *Producer) WriteRecord(record *URLRecord) error {
 	return p.encoder.Encode(&record)
 }
 
@@ -53,8 +50,8 @@ func NewConsumer(fileName string) (*Consumer, error) {
 	}, nil
 }
 
-func (c *Consumer) ReadRecord() (*FileRecord, error) {
-	record := &FileRecord{}
+func (c *Consumer) ReadRecord() (*URLRecord, error) {
+	record := &URLRecord{}
 	if err := c.decoder.Decode(&record); err != nil {
 		return nil, err
 	}
@@ -81,7 +78,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	for {
 		record, err := consumer.ReadRecord()
 		if record != nil {
-			fileStore.cache.SaveURL(record.ShortURL, record.OriginalURL)
+			fileStore.cache.SaveURL(record)
 		}
 		if err == io.EOF {
 			break
@@ -105,32 +102,31 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	return fileStore, nil
 }
 
-func (fs *fileStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
+func (fs *fileStore) RetrieveInitialURL(_ context.Context, sURL ShortURL) (OriginalURL, error) {
 	return fs.cache.RetrieveInitialURL(sURL)
 }
 
-func (fs *fileStore) SaveURL(sURL ShortURL, url OriginalURL) error {
-	savedURL, err := fs.cache.RetrieveInitialURL(sURL)
+func (fs *fileStore) SaveURL(_ context.Context, record *URLRecord) error {
+	savedURL, err := fs.cache.RetrieveInitialURL(record.ShortURL)
 	if err != nil && !errors.Is(err, ErrURLNotFound) {
 		return err
 	}
 
-	if savedURL == url {
+	if savedURL == record.OriginalURL {
 		return nil
 	}
 
-	if !config.FileStorage.WriteRequired() {
-		return fs.cache.SaveURL(sURL, url)
+	record.ID = uuid.New().String()
+
+	if config.FileStorage.WriteRequired() {
+		if err := fs.file.WriteRecord(record); err != nil {
+			return fmt.Errorf("write record: %w", err)
+		}
 	}
 
-	record := &FileRecord{
-		ShortURL:    sURL,
-		OriginalURL: url,
-	}
+	return fs.cache.SaveURL(record)
+}
 
-	if err := fs.file.WriteRecord(record); err != nil {
-		return fmt.Errorf("write record: %w", err)
-	}
-
-	return fs.cache.SaveURL(sURL, url)
+func (fs *fileStore) Ping(_ context.Context) error {
+	return ErrDBNotConnected
 }

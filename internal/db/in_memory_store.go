@@ -7,28 +7,28 @@ import (
 
 type inMemoryStore struct {
 	mu    sync.RWMutex
-	store map[ShortURL]OriginalURL
+	store map[ShortURL]URLRecord
 }
 
 func NewInMemoryStore() *inMemoryStore {
-	return &inMemoryStore{store: make(map[ShortURL]OriginalURL)}
+	return &inMemoryStore{store: make(map[ShortURL]URLRecord)}
 }
 
 func (s *inMemoryStore) RetrieveInitialURL(sURL ShortURL) (OriginalURL, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	url, found := s.store[sURL]
+	record, found := s.store[sURL]
 	if !found {
-		return "", fmt.Errorf("%w: %s", ErrURLNotFound, sURL)
+		return "", fmt.Errorf("%w: %s", ErrURLNotFound, record.ShortURL)
 	}
 
-	return url, nil
+	return record.OriginalURL, nil
 }
 
-func (s *inMemoryStore) SaveURL(sURL ShortURL, url OriginalURL) error {
+func (s *inMemoryStore) SaveURL(r *URLRecord) error {
 	s.mu.Lock()
-	s.store[sURL] = url
+	s.store[r.ShortURL] = *r
 	s.mu.Unlock()
 
 	return nil

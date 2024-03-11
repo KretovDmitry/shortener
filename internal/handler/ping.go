@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/KretovDmitry/shortener/internal/db"
 	"go.uber.org/zap"
 )
 
@@ -19,8 +21,10 @@ func (h *handler) PingDB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.sqlStore.Ping(context.TODO()); err != nil {
-		h.logger.Error("ping postgres", zap.Error(err))
+	if err := h.store.Ping(context.TODO()); err != nil {
+		if !errors.Is(err, db.ErrDBNotConnected) {
+			h.logger.Error("ping postgres", zap.Error(err))
+		}
 		msg := fmt.Sprintf("Internal server error: %v", err)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return

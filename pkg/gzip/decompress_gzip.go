@@ -48,6 +48,7 @@ func Unzip(next http.HandlerFunc) http.HandlerFunc {
 		if sendsGzip {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
+				// TODO: logger from context
 				log.Printf("new compress reader: %v", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return

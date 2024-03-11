@@ -43,7 +43,7 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 
 	originalURL := string(body)
 
-	shortURL, err := shorturl.Generate(originalURL)
+	generatedShortURL, err := shorturl.Generate(originalURL)
 	if err != nil {
 		h.logger.Error("failed to generate short URL", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
@@ -51,7 +51,9 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SaveURL(db.ShortURL(shortURL), db.OriginalURL(originalURL)); err != nil {
+	newRecord := db.NewRecord(generatedShortURL, originalURL)
+
+	if err := h.store.SaveURL(r.Context(), newRecord); err != nil {
 		h.logger.Error("failed to save URL", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		http.Error(w, msg, http.StatusInternalServerError)
@@ -60,5 +62,5 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf("http://%s/%s", config.AddrToReturn, shortURL)))
+	w.Write([]byte(fmt.Sprintf("http://%s/%s", config.AddrToReturn, generatedShortURL)))
 }

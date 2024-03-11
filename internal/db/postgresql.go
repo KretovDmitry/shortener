@@ -39,15 +39,22 @@ func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
 		return nil, fmt.Errorf("new postgresql client: %w", err)
 	}
 
-	// Execute a query to create the URL table if it does not exist.
-	result, err := pool.Exec(ctx, `
+	q := `
 		CREATE TABLE IF NOT EXISTS public.url (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			short_url VARCHAR(8) NOT NULL UNIQUE,
 			original_url VARCHAR(255) NOT NULL UNIQUE
 		)
-	`)
-	if err != nil {
+	`
+
+	// Execute a query to create the URL table if it does not exist.
+	if result, err := pool.Exec(ctx, q); err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			// Create a new error with additional context.
+			return nil, fmt.Errorf("save url with query (%s): %w",
+				formatQuery(q), formatPgError(pgErr),
+			)
+		}
 		return nil, fmt.Errorf("create table with status %s: %w", result, err)
 	}
 
@@ -67,10 +74,13 @@ func (pg *postgresStore) SaveURL(ctx context.Context, r *URLRecord) error {
         RETURNING id
     `
 
+	// FIXME: r.ID remains empty if the URL record already exists.
 	// Query the database to insert the URL record.
 	if err := pg.store.QueryRow(ctx, q, r.ShortURL, r.OriginalURL).Scan(&r.ID); err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			// Check if the error is a unique constraint violation.
+			// Constraint violation means that the URL record already exists.
+			// All fields are unique, so we can safely ignore this error.
 			if pgErr.Code == "23505" {
 				return nil
 			}

@@ -12,13 +12,13 @@ import (
 )
 
 type handler struct {
-	store  db.Store
+	store  db.URLStorage
 	logger *zap.Logger
 }
 
 // New constructs a new handlerContext,
 // ensuring that the dependencies are valid values
-func New(store db.Store) (*handler, error) {
+func New(store db.URLStorage) (*handler, error) {
 	if store == nil {
 		return nil, errors.New("nil store")
 	}
@@ -31,7 +31,6 @@ func New(store db.Store) (*handler, error) {
 
 // Register sets up the routes for the HTTP server.
 func (h *handler) Register(r *chi.Mux) {
-	// Build middleware chain for request handling.
 	chain := middleware.BuildChain(
 		gzip.DefaultHandler().WrapHandler,
 		middleware.RequestLogger,
@@ -41,6 +40,8 @@ func (h *handler) Register(r *chi.Mux) {
 	// Register routes.
 	r.Post("/", chain(h.ShortenText))
 	r.Post("/api/shorten", chain(h.ShortenJSON))
+	r.Post("/api/shorten/batch", chain(h.ShortenBatch))
+
 	r.Get("/{shortURL}", chain(h.Redirect))
-	r.Get("/ping", middleware.RequestLogger(h.PingDB))
+	r.Get("/ping", chain(h.PingDB))
 }

@@ -36,6 +36,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
+// RequestLogger is a middleware function that logs the request and response details
 func RequestLogger(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		l := logger.Get()
@@ -43,6 +44,7 @@ func RequestLogger(next http.HandlerFunc) http.HandlerFunc {
 
 		lrw := newLoggingResponseWriter(w)
 
+		// defer function that logs the request details
 		defer func(start time.Time) {
 			l.Info(
 				fmt.Sprintf(

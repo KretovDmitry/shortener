@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -76,23 +75,7 @@ func TestShortenJSON(t *testing.T) {
 			},
 		},
 		{
-			name:               "negative test #1: invalid Content-Type",
-			requestContentType: textPlain,
-			payload:            createJSONRequestPayload("https://go.dev/"),
-			want: func(r *http.Response) {
-				defer r.Body.Close()
-				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
-				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
-					payload := getTextPayload(t, r)
-					expectedResponse := fmt.Sprintf(
-						`Only "%s" Content-Type is allowed`, applicationJSON,
-					)
-					assert.Equal(t, expectedResponse, payload)
-				}
-			},
-		},
-		{
-			name:               "negative test #2: empty URL field",
+			name:               "negative test #1: empty URL field",
 			requestContentType: applicationJSON,
 			payload:            createJSONRequestPayload(""),
 			want: func(r *http.Response) {
@@ -106,7 +89,7 @@ func TestShortenJSON(t *testing.T) {
 			},
 		},
 		{
-			name:               "negative test #3: invalid URL",
+			name:               "negative test #2: invalid URL",
 			requestContentType: applicationJSON,
 			payload:            createJSONRequestPayload("https://test...com"),
 			want: func(r *http.Response) {

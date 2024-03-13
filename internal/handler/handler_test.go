@@ -25,17 +25,21 @@ type mockStore struct {
 }
 
 // do nothing on create
-func (s *mockStore) SaveURL(context.Context, *db.URLRecord) error {
+func (s *mockStore) Save(context.Context, *db.URL) error {
+	return nil
+}
+
+func (s *mockStore) SaveAll(context.Context, []*db.URL) error {
 	return nil
 }
 
 // return expected data
-func (s *mockStore) RetrieveInitialURL(context.Context, db.ShortURL) (db.OriginalURL, error) {
+func (s *mockStore) Get(context.Context, db.ShortURL) (*db.URL, error) {
 	// mock not found error
 	if s.expectedData == "" {
-		return "", db.ErrURLNotFound
+		return nil, db.ErrURLNotFound
 	}
-	return db.OriginalURL(s.expectedData), nil
+	return &db.URL{OriginalURL: db.OriginalURL(s.expectedData)}, nil
 }
 func (s *mockStore) Ping(context.Context) error {
 	return nil
@@ -45,7 +49,7 @@ func TestNew(t *testing.T) {
 	emptyMockStore := &mockStore{expectedData: ""}
 
 	type args struct {
-		store db.Store
+		store db.URLStorage
 	}
 	tests := []struct {
 		name    string

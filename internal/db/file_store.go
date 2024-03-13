@@ -29,7 +29,7 @@ func NewProducer(fileName string) (*Producer, error) {
 	}, nil
 }
 
-func (p *Producer) WriteRecord(record *URLRecord) error {
+func (p *Producer) WriteRecord(record *URL) error {
 	return p.encoder.Encode(&record)
 }
 
@@ -50,8 +50,8 @@ func NewConsumer(fileName string) (*Consumer, error) {
 	}, nil
 }
 
-func (c *Consumer) ReadRecord() (*URLRecord, error) {
-	record := &URLRecord{}
+func (c *Consumer) ReadRecord() (*URL, error) {
+	record := new(URL)
 	if err := c.decoder.Decode(&record); err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	for {
 		record, err := consumer.ReadRecord()
 		if record != nil {
-			fileStore.cache.SaveURL(record)
+			fileStore.cache.Save(record)
 		}
 		if err == io.EOF {
 			break
@@ -102,29 +102,39 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	return fileStore, nil
 }
 
-func (fs *fileStore) RetrieveInitialURL(_ context.Context, sURL ShortURL) (OriginalURL, error) {
-	return fs.cache.RetrieveInitialURL(sURL)
+func (fs *fileStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
+	return fs.cache.Get(ctx, sURL)
 }
 
-func (fs *fileStore) SaveURL(_ context.Context, record *URLRecord) error {
-	savedURL, err := fs.cache.RetrieveInitialURL(record.ShortURL)
+func (fs *fileStore) Save(ctx context.Context, u *URL) error {
+	record, err := fs.cache.Get(ctx, u.ShortURL)
 	if err != nil && !errors.Is(err, ErrURLNotFound) {
 		return err
 	}
 
-	if savedURL == record.OriginalURL {
+	if record.OriginalURL == u.OriginalURL {
 		return nil
 	}
 
-	record.ID = uuid.New().String()
+	u.ID = uuid.New().String()
 
 	if config.FileStorage.WriteRequired() {
-		if err := fs.file.WriteRecord(record); err != nil {
+		if err := fs.file.WriteRecord(u); err != nil {
 			return fmt.Errorf("write record: %w", err)
 		}
 	}
 
-	return fs.cache.SaveURL(record)
+	return fs.cache.Save(u)
+}
+
+func (fs *fileStore) SaveAll(ctx context.Context, u []*URL) error {
+	for _, url := range u {
+		if err := fs.Save(ctx, url); err != nil {
+			return fmt.Errorf("save url: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (fs *fileStore) Ping(_ context.Context) error {

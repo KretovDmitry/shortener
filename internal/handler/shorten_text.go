@@ -53,7 +53,7 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 
 	newRecord := db.NewRecord(generatedShortURL, originalURL)
 
-	if err := h.store.SaveURL(r.Context(), newRecord); err != nil {
+	if err := h.store.Save(r.Context(), newRecord); err != nil {
 		h.logger.Error("failed to save URL", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		http.Error(w, msg, http.StatusInternalServerError)

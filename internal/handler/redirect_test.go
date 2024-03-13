@@ -16,7 +16,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 	tests := []struct {
 		name     string
 		shortURL string
-		store    db.Store
+		store    db.URLStorage
 		want     func(res *http.Response)
 	}{
 		{

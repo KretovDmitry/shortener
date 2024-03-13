@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
+
+type loggerCtxKey struct{}
 
 var once sync.Once
 
@@ -77,4 +80,26 @@ func Get() *zap.Logger {
 	})
 
 	return zap.L()
+}
+
+// FromCtx returns the Logger associated with the ctx.
+// If no logger is associated, the default logger is returned.
+func FromCtx(ctx context.Context) *zap.Logger {
+	if l, ok := ctx.Value(loggerCtxKey{}).(*zap.Logger); ok {
+		return l
+	}
+
+	return Get()
+}
+
+// WithCtx returns a copy of ctx with the Logger attached.
+func WithCtx(ctx context.Context, l *zap.Logger) context.Context {
+	if lp, ok := ctx.Value(loggerCtxKey{}).(*zap.Logger); ok {
+		if lp == l {
+			// Do not store same logger.
+			return ctx
+		}
+	}
+
+	return context.WithValue(ctx, loggerCtxKey{}, l)
 }

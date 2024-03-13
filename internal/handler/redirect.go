@@ -13,8 +13,18 @@ import (
 
 var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]{8}$`)
 
+// Redirect serves a redirect to the original URL based on the shortened URL.
 func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
+
+	// check request method
+	if r.Method != http.MethodGet {
+		// Yandex Practicum technical specification requires
+		// using a status code of 400 Bad Request instead of 405 Method Not Allowed.
+		h.logger.Info("got request with bad method", zap.String("method", r.Method))
+		http.Error(w, `Only POST method is allowed`, http.StatusBadRequest)
+		return
+	}
 
 	shortURL := chi.URLParam(r, "shortURL")
 
@@ -24,7 +34,7 @@ func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := h.store.RetrieveInitialURL(r.Context(), db.ShortURL(shortURL))
+	record, err := h.store.Get(r.Context(), db.ShortURL(shortURL))
 	if err != nil {
 		if errors.Is(err, db.ErrURLNotFound) {
 			h.logger.Info("requested non-existent URL", zap.String("url", shortURL))
@@ -37,6 +47,6 @@ func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Location", string(url))
+	w.Header().Set("Location", string(record.OriginalURL))
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }

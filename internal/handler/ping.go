@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,18 +9,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// PingDB checks the status of the database connection.
+//
+// Method: GET
 func (h *handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 
-	// guard in case of future router switching
+	// check request method
 	if r.Method != http.MethodGet {
+		// Yandex Practicum technical specification requires
+		// using a status code of 400 Bad Request instead of 405 Method Not Allowed.
 		h.logger.Info("got request with bad method", zap.String("method", r.Method))
-		msg := `Only GET method is allowed`
-		http.Error(w, msg, http.StatusBadRequest)
+		http.Error(w, `Only GET method is allowed`, http.StatusBadRequest)
 		return
 	}
 
-	if err := h.store.Ping(context.TODO()); err != nil {
+	if err := h.store.Ping(r.Context()); err != nil {
 		if !errors.Is(err, db.ErrDBNotConnected) {
 			h.logger.Error("ping postgres", zap.Error(err))
 		}

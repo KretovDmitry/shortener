@@ -112,7 +112,7 @@ func (fs *fileStore) Save(ctx context.Context, u *URL) error {
 		return err
 	}
 
-	if record.OriginalURL == u.OriginalURL {
+	if record != nil && record.OriginalURL == u.OriginalURL {
 		return nil
 	}
 

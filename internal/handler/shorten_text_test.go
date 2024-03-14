@@ -1,18 +1,17 @@
 package handler
 
 import (
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestShortenText(t *testing.T) {
-	emptyMockStore := &mockStore{expectedData: ""}
 	path := "/"
 
 	type want struct {
@@ -25,7 +24,7 @@ func TestShortenText(t *testing.T) {
 		method      string
 		contentType string
 		payload     string
-		store       *mockStore
+		store       db.URLStorage
 		want        want
 	}{
 		{
@@ -62,9 +61,64 @@ func TestShortenText(t *testing.T) {
 			},
 		},
 		{
-			name:        "positive test #3: charset=utf-8",
+			name:        "invalid method: method get",
+			method:      http.MethodGet,
+			contentType: textPlain,
+			payload:     "https://go.dev/",
+			store:       &mockStore{expectedData: "https://go.dev/"},
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+			},
+		},
+		{
+			name:        "invalid method: method put",
+			method:      http.MethodPut,
+			contentType: textPlain,
+			payload:     "https://go.dev/",
+			store:       &mockStore{expectedData: "https://go.dev/"},
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+			},
+		},
+		{
+			name:        "invalid method: method patch",
+			method:      http.MethodPatch,
+			contentType: textPlain,
+			payload:     "https://go.dev/",
+			store:       &mockStore{expectedData: "https://go.dev/"},
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+			},
+		},
+		{
+			name:        "invalid method: method delete",
+			method:      http.MethodDelete,
+			contentType: textPlain,
+			payload:     "https://go.dev/",
+			store:       &mockStore{expectedData: "https://go.dev/"},
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+			},
+		},
+		{
+			name:        "invalid content-type: application/json",
 			method:      http.MethodPost,
-			contentType: "text/plain; charset=utf-8",
+			contentType: applicationJSON,
+			payload:     "https://go.dev/",
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   "bad content-type: " + ErrOnlyTextContentType.Error(),
+			},
+		},
+		{
+			name:        "text plain with some charset: utf-16",
+			method:      http.MethodPost,
+			contentType: "text/plain; charset=utf-16",
 			payload:     "https://go.dev/",
 			store:       emptyMockStore,
 			want: want{
@@ -73,36 +127,25 @@ func TestShortenText(t *testing.T) {
 			},
 		},
 		{
-			name:        "negative test #1: invalid Content-Type",
+			name:        "empty body",
 			method:      http.MethodPost,
-			contentType: applicationJSON,
+			contentType: textPlain,
+			payload:     "",
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   "body is empty: " + ErrURLIsNotProvided.Error(),
+			},
+		},
+		{
+			name:        "failed to save URL to database",
+			method:      http.MethodPost,
+			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       &brokenStore{},
 			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   `Only "text/plain" Content-Type is allowed`,
-			},
-		},
-		{
-			name:        "negative test #2: empty body",
-			method:      http.MethodPost,
-			contentType: textPlain,
-			payload:     "",
-			store:       emptyMockStore,
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   `Empty body, must contain URL`,
-			},
-		},
-		{
-			name:        "negative test #3: invalid method",
-			method:      http.MethodGet,
-			contentType: textPlain,
-			payload:     "",
-			store:       emptyMockStore,
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   `Only POST method is allowed`,
+				statusCode: http.StatusInternalServerError,
+				response:   "failed to save to database: intentionally not working method",
 			},
 		},
 	}
@@ -125,22 +168,19 @@ func TestShortenText(t *testing.T) {
 			// get recorded data
 			res := w.Result()
 
-			// read the data and close the body; stop test if failed to read body
-			resBody, err := io.ReadAll(res.Body)
-			defer res.Body.Close()
-			require.NoError(t, err)
+			// read the response and close the body; stop test if failed to read body
+			response := getResponseTextPayload(t, res)
+			res.Body.Close()
 
 			// if response contains URL (positive scenarios), take only short URL
-			strResBody := string(resBody)
-			if strings.HasPrefix(strResBody, "http") {
-				g := strings.Split(strResBody, "/")
-				strResBody = g[len(g)-1]
+			if strings.HasPrefix(response, "http") {
+				response = getShortURL(response)
 			}
 
 			// assert wanted data
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			assert.Equal(t, textPlain, res.Header.Get(contentType))
-			assert.Equal(t, tt.want.response, strings.TrimSpace(strResBody))
+			assert.Equal(t, tt.want.response, response)
 		})
 	}
 }

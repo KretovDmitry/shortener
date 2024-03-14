@@ -2,10 +2,10 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/pkg/errors"
 )
 
 type URLStorage interface {

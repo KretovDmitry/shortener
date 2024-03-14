@@ -29,12 +29,12 @@ type (
 // [
 //
 //	{
-//	  "correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//	  "original_url": "http://nywha1.yandex/ovuaqasue6jd4"
+//		"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
+//		"original_url": "http://nywha1.yandex/ovuaqasue6jd4"
 //	},
 //	{
-//	  "correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//	  "original_url": "http://wakkz7fjeuj.yandex/uwijfp9cbpn/a3hfjaww/x0mhpeq"
+//		"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
+//		"original_url": "http://wakkz7fjeuj.yandex/uwijfp9cbpn/a3hfjaww/x0mhpeq"
 //	}
 //
 // ]
@@ -43,13 +43,13 @@ type (
 // [
 //
 //	{
-//	  "correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//	  "short_url": "http://config.AddrToReturn/Base58{8}"
+//		"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
+//		"short_url": "http://config.AddrToReturn/Base58{8}"
 //	},
 //	{
-//	  "correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//	  "short_url": "http://config.AddrToReturn/Base58{8}"
-//	}
+//		"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
+//		"short_url": "http://config.AddrToReturn/Base58{8}"
+//	},
 //
 // ]
 func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {

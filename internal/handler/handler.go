@@ -16,6 +16,14 @@ type handler struct {
 	logger *zap.Logger
 }
 
+var (
+	ErrOnlyGETMethodIsAllowed         = errors.New("only GET method is allowed")
+	ErrOnlyPOSTMethodIsAllowed        = errors.New("only POST method is allowed")
+	ErrOnlyApplicationJSONContentType = errors.New("only application/json content-type is allowed")
+	ErrOnlyTextContentType            = errors.New("only text/plain content-type is allowed")
+	ErrURLIsNotProvided               = errors.New("URL is not provided")
+)
+
 // New constructs a new handlerContext,
 // ensuring that the dependencies are valid values
 func New(store db.URLStorage) (*handler, error) {

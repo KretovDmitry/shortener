@@ -50,7 +50,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				assert.Equal(t, `Only POST method is allowed`, getTextPayload(t, res))
+				assert.Equal(t, `Only POST method is allowed`, getResponseTextPayload(t, res))
 			},
 		},
 		{
@@ -61,7 +61,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
+				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, "Invalid URL: Too_Long_URL", resBody)
 			},
 		},
@@ -73,7 +73,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
+				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, "Invalid URL: short", resBody)
 			},
 		},
@@ -85,7 +85,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
+				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, "Invalid URL: O0Il0O", resBody)
 			},
 		},
@@ -97,8 +97,20 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			want: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
+				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, "No such URL: 2x1xx1x2", resBody)
+			},
+		},
+		{
+			name:     "failed to get URL from database",
+			method:   http.MethodGet,
+			shortURL: "2x1xx1x2",
+			store:    &brokenStore{},
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
+				resBody := getResponseTextPayload(t, res)
+				assert.Equal(t, "Internal server error: intentionally not working method", resBody)
 			},
 		},
 	}

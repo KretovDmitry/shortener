@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	defaultHost = "0.0.0.0"
-	defaultPort = 8080
+	defaultHost     = "0.0.0.0"
+	defaultPort     = 8080
+	defaultFileName = "short-url-db.json"
 )
 
 type netAddress struct {
@@ -60,7 +61,6 @@ type fileStorage struct {
 }
 
 func NewFileStorage() *fileStorage {
-	const defaultFileName = "short-url-db.json"
 	tmp := os.TempDir()
 	return &fileStorage{
 		path:          path.Join(tmp, defaultFileName),

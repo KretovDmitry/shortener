@@ -19,7 +19,9 @@ type (
 	}
 
 	shortenJSONResponsePayload struct {
-		Result db.ShortURL `json:"result"`
+		Result  db.ShortURL `json:"result"`
+		Success bool        `json:"success"`
+		Message string      `json:"message"`
 	}
 )
 
@@ -39,6 +41,8 @@ type (
 //	Content-Type: application/json
 //	{
 //	    "result": "http://config.AddrToReturn/Base58{8}"
+//		"success": true
+//		"message": "OK"
 //	}
 func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
@@ -46,51 +50,40 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// check request method
 	if r.Method != http.MethodPost {
-		// Yandex Practicum technical specification requires
-		// using a status code of 400 Bad Request instead of 405 Method Not Allowed.
-		h.logger.Info("got request with bad method", zap.String("method", r.Method))
-		http.Error(w, `Only POST method is allowed`, http.StatusBadRequest)
+		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
+		h.shortenJSONError(w, "bad method", ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
 		return
 	}
 
 	// check content type
-	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
-	if contentType != "application/json" {
-		h.logger.Info("got request with bad content-type",
-			zap.String("content-type", r.Header.Get("Content-Type")))
-		msg := `Only "application/json" Content-Type is allowed`
-		http.Error(w, msg, http.StatusBadRequest)
+	if strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))) != "application/json" {
+		h.shortenJSONError(w, "bad content-type", ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
 		return
 	}
 
 	// decode request body
 	var payload shortenJSONRequestPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		msg := "failed decode request JSON body"
-		h.logger.Error(msg, zap.Error(err))
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.shortenJSONError(w, "failed to decode request", err, http.StatusInternalServerError)
 		return
 	}
 
 	// check if URL is provided
 	if len(payload.URL) == 0 {
-		http.Error(w, "url field is empty", http.StatusBadRequest)
+		h.shortenJSONError(w, "url field is empty", ErrURLIsNotProvided, http.StatusBadRequest)
 		return
 	}
 
 	// check if URL is a valid URL
 	if !govalidator.IsURL(payload.URL) {
-		msg := fmt.Sprintf("Provided string is not a URL: %s", payload.URL)
-		http.Error(w, msg, http.StatusBadRequest)
+		h.shortenJSONError(w, "provided url isn't valid: "+payload.URL, ErrURLIsNotProvided, http.StatusBadRequest)
 		return
 	}
 
 	// generate short URL
 	generatedShortURL, err := shorturl.Generate(payload.URL)
 	if err != nil {
-		msg := fmt.Sprintf("failed to generate short URL: %s", payload.URL)
-		h.logger.Error(msg, zap.Error(err))
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.shortenJSONError(w, "failed to shorten url: "+payload.URL, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -99,9 +92,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
 	if err != nil && !errors.Is(err, db.ErrConflict) {
-		h.logger.Error("failed to save URLs", zap.Error(err))
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.shortenJSONError(w, "failed to save to database", err, http.StatusInternalServerError)
 		return
 	}
 
@@ -115,13 +106,30 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create response payload
-	result := shortenJSONResponsePayload{Result: db.ShortURL(generatedShortURL)}
+	result := shortenJSONResponsePayload{Result: db.ShortURL(generatedShortURL), Success: true, Message: "OK"}
 
 	// encode response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		msg := "failed to encode JSON response"
-		h.logger.Error(msg, zap.Error(err))
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.logger.Error("failed to encode response", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+}
+
+// shortenJSONError encodes an error as JSON and writes it to the response.
+// If the error is a server-side error, it logs it using the provided logger.
+func (h *handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
+	if code >= 500 {
+		h.logger.Error(message, zap.Error(err))
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	err = json.NewEncoder(w).Encode(shortenJSONResponsePayload{
+		Success: false,
+		Message: fmt.Sprintf("%s: %s", message, err),
+	})
+	if err != nil {
+		h.logger.Error("failed to encode response", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

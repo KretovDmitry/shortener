@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -18,6 +19,9 @@ const (
 	textPlain       = "text/plain; charset=utf-8"
 	applicationJSON = "application/json"
 )
+
+var errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
+var emptyMockStore = &mockStore{expectedData: ""}
 
 // mokeStore must implement URLStore interface
 type mockStore struct {
@@ -46,6 +50,19 @@ func (s *mockStore) Get(context.Context, db.ShortURL) (*db.URL, error) {
 }
 func (s *mockStore) Ping(context.Context) error {
 	return nil
+}
+
+// simulating errors with storage operations
+type brokenStore struct {
+	mockStore
+}
+
+func (s *brokenStore) Save(context.Context, *db.URL) error {
+	return errIntentionallyNotWorkingMethod
+}
+
+func (s *brokenStore) Get(context.Context, db.ShortURL) (*db.URL, error) {
+	return nil, errIntentionallyNotWorkingMethod
 }
 
 func TestNew(t *testing.T) {
@@ -93,10 +110,17 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func getTextPayload(t *testing.T, res *http.Response) string {
+func getResponseTextPayload(t *testing.T, res *http.Response) string {
 	resBody, err := io.ReadAll(res.Body)
-	defer res.Body.Close()
+	res.Body.Close()
 	require.NoError(t, err)
-
 	return strings.TrimSpace(string(resBody))
+}
+
+func getShortURL(s string) (res string) {
+	if strings.HasPrefix(s, "http") {
+		slice := strings.Split(s, "/")
+		res = slice[len(slice)-1]
+	}
+	return
 }

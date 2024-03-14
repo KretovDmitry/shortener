@@ -12,10 +12,7 @@ import (
 )
 
 func TestShortenText(t *testing.T) {
-	// we don't retrieve any data from the store
-	// handler returns newly created short URL
 	emptyMockStore := &mockStore{expectedData: ""}
-
 	path := "/"
 
 	type want struct {
@@ -24,69 +21,102 @@ func TestShortenText(t *testing.T) {
 	}
 
 	tests := []struct {
-		name               string
-		requestContentType string
-		payload            string
-		want               want
+		name        string
+		method      string
+		contentType string
+		payload     string
+		store       *mockStore
+		want        want
 	}{
 		{
-			name:               "positive test #1",
-			requestContentType: textPlain,
-			payload:            "https://e.mail.ru/inbox/",
+			name:        "positive test #1",
+			method:      http.MethodPost,
+			contentType: textPlain,
+			payload:     "https://e.mail.ru/inbox/",
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "be8xnp4H",
 			},
 		},
 		{
-			name:               "positive test #2",
-			requestContentType: textPlain,
-			payload:            "https://go.dev/",
+			name:        "positive test #2",
+			method:      http.MethodPost,
+			contentType: textPlain,
+			payload:     "https://go.dev/",
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "eDKZ8wBC",
 			},
 		},
 		{
-			name:               "positive test #3: charset=utf-8",
-			requestContentType: "text/plain; charset=utf-8",
-			payload:            "https://go.dev/",
+			name:        "positive test #3: status code 409 (Conflict)",
+			method:      http.MethodPost,
+			contentType: textPlain,
+			payload:     "https://go.dev/",
+			store:       &mockStore{expectedData: "https://go.dev/"},
+			want: want{
+				statusCode: http.StatusConflict,
+				response:   "eDKZ8wBC",
+			},
+		},
+		{
+			name:        "positive test #3: charset=utf-8",
+			method:      http.MethodPost,
+			contentType: "text/plain; charset=utf-8",
+			payload:     "https://go.dev/",
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "eDKZ8wBC",
 			},
 		},
 		{
-			name:               "negative test #1: invalid Content-Type",
-			requestContentType: applicationJSON,
-			payload:            "https://go.dev/",
+			name:        "negative test #1: invalid Content-Type",
+			method:      http.MethodPost,
+			contentType: applicationJSON,
+			payload:     "https://go.dev/",
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   `Only "text/plain" Content-Type is allowed`,
 			},
 		},
 		{
-			name:               "negative test #2: empty body",
-			requestContentType: textPlain,
-			payload:            "",
+			name:        "negative test #2: empty body",
+			method:      http.MethodPost,
+			contentType: textPlain,
+			payload:     "",
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   `Empty body, must contain URL`,
 			},
 		},
+		{
+			name:        "negative test #3: invalid method",
+			method:      http.MethodGet,
+			contentType: textPlain,
+			payload:     "",
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   `Only POST method is allowed`,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// create request with the content type and the payload being tested
-			// the method and the path are always the same
-			r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(tt.payload))
-			r.Header.Set(contentType, tt.requestContentType)
+			// create request with the method, content type and the payload being tested
+			r := httptest.NewRequest(tt.method, path, strings.NewReader(tt.payload))
+			r.Header.Set(contentType, tt.contentType)
 
 			// response recorder
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(emptyMockStore)
+			hctx, err := New(tt.store)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

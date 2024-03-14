@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/google/uuid"
 )
 
 type Producer struct {
@@ -106,31 +105,52 @@ func (fs *fileStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
 	return fs.cache.Get(ctx, sURL)
 }
 
-func (fs *fileStore) Save(ctx context.Context, u *URL) error {
-	record, err := fs.cache.Get(ctx, u.ShortURL)
+func (fs *fileStore) Save(ctx context.Context, url *URL) error {
+	// checking if the record already exists in the cache
+	record, err := fs.cache.Get(ctx, url.ShortURL)
 	if err != nil && !errors.Is(err, ErrURLNotFound) {
 		return err
 	}
 
-	if record != nil && record.OriginalURL == u.OriginalURL {
-		return nil
+	// if the record already exists return ErrConflict
+	if record != nil && record.OriginalURL == url.OriginalURL {
+		return ErrConflict
 	}
 
-	u.ID = uuid.New().String()
-
+	// write the record to the file if required
 	if config.FileStorage.WriteRequired() {
-		if err := fs.file.WriteRecord(u); err != nil {
+		if err := fs.file.WriteRecord(url); err != nil {
 			return fmt.Errorf("write record: %w", err)
 		}
 	}
 
-	return fs.cache.Save(u)
+	// save the record to the cache if writing to the file was successful if required
+	return fs.cache.Save(url)
 }
 
-func (fs *fileStore) SaveAll(ctx context.Context, u []*URL) error {
-	for _, url := range u {
-		if err := fs.Save(ctx, url); err != nil {
-			return fmt.Errorf("save url: %w", err)
+func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
+	for _, url := range urls {
+		// checking if the record already exists in the cache
+		record, err := fs.cache.Get(ctx, url.ShortURL)
+		if err != nil && !errors.Is(err, ErrURLNotFound) {
+			return err
+		}
+
+		// if the record already exists skip the record
+		if record != nil && record.OriginalURL == url.OriginalURL {
+			continue
+		}
+
+		// write the record to the file if required
+		if config.FileStorage.WriteRequired() {
+			if err = fs.file.WriteRecord(url); err != nil {
+				return fmt.Errorf("write file record: %w", err)
+			}
+		}
+
+		// save the record to the cache if writing to the file was successful if required
+		if err = fs.cache.Save(url); err != nil {
+			return fmt.Errorf("save record: %w", err)
 		}
 	}
 

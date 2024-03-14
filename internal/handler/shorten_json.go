@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -73,14 +74,13 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// check if URL is provided
 	if len(payload.URL) == 0 {
-		msg := "The URL field in the JSON body of the request is empty"
-		http.Error(w, msg, http.StatusBadRequest)
+		http.Error(w, "url field is empty", http.StatusBadRequest)
 		return
 	}
 
 	// check if URL is a valid URL
 	if !govalidator.IsURL(payload.URL) {
-		msg := fmt.Sprintf("The provided string is not a URL: %s", payload.URL)
+		msg := fmt.Sprintf("Provided string is not a URL: %s", payload.URL)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
@@ -88,30 +88,38 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// generate short URL
 	generatedShortURL, err := shorturl.Generate(payload.URL)
 	if err != nil {
-		h.logger.Error("failed to generate short URL", zap.Error(err))
-		msg := fmt.Sprintf("Internal server error: %s", err)
+		msg := fmt.Sprintf("failed to generate short URL: %s", payload.URL)
+		h.logger.Error(msg, zap.Error(err))
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 
-	// save URL to database
 	newRecord := db.NewRecord(generatedShortURL, payload.URL)
-	if err := h.store.Save(r.Context(), newRecord); err != nil {
+
+	// save URL to database
+	err = h.store.Save(r.Context(), newRecord)
+	if err != nil && !errors.Is(err, db.ErrConflict) {
 		h.logger.Error("failed to save URLs", zap.Error(err))
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 
-	// set response headers
+	// Set the response headers and status code
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	switch {
+	case errors.Is(err, db.ErrConflict):
+		w.WriteHeader(http.StatusConflict)
+	default:
+		w.WriteHeader(http.StatusCreated)
+	}
 
 	// create response payload
 	result := shortenJSONResponsePayload{Result: db.ShortURL(generatedShortURL)}
+
 	// encode response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		msg := "failed to encode the body of the JSON response"
+		msg := "failed to encode JSON response"
 		h.logger.Error(msg, zap.Error(err))
 		http.Error(w, msg, http.StatusInternalServerError)
 		return

@@ -18,6 +18,7 @@ type URLStorage interface {
 var (
 	ErrURLNotFound    = errors.New("URL not found")
 	ErrDBNotConnected = errors.New("database not connected")
+	ErrConflict       = errors.New("data conflict")
 )
 
 // NewStore creates a new instance of URLStorage based on the configuration
@@ -28,6 +29,7 @@ func NewStore(ctx context.Context) (URLStorage, error) {
 		if err != nil {
 			return nil, fmt.Errorf("new postgres store: %w", err)
 		}
+
 		return store, nil
 	}
 

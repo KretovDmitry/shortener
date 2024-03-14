@@ -84,15 +84,16 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("received batch request", zap.Int("count", len(payload)))
+	h.logger.Debug("received batch request", zap.Int("count", len(payload)))
 
-	// Prepare the records to save.
+	// Prepare the records to save and send.
 	recordsToSave := make([]*db.URL, len(payload))
 	result := make([]shortenBatchResponsePayload, len(payload))
 	for i, p := range payload {
+		// generate short URL
 		shortURL, err := shorturl.Generate(p.OriginalURL)
 		if err != nil {
-			msg := fmt.Sprintf("failed to shorten %s", p.OriginalURL)
+			msg := fmt.Sprintf("failed to generate short URL: %s", p.OriginalURL)
 			h.logger.Error(msg, zap.Error(err))
 			http.Error(w, msg, http.StatusInternalServerError)
 			return
@@ -102,7 +103,7 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, db.ShortURL(shortURL)}
 	}
 
-	h.logger.Info("saving batch of records", zap.Int("count", len(recordsToSave)))
+	h.logger.Debug("saving batch of records", zap.Int("count", len(recordsToSave)))
 
 	// Save the records.
 	if err := h.store.SaveAll(r.Context(), recordsToSave); err != nil {

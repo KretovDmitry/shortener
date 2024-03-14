@@ -24,8 +24,11 @@ type mockStore struct {
 	expectedData string
 }
 
-// do nothing on create
-func (s *mockStore) Save(context.Context, *db.URL) error {
+// do nothing on create, return ErrConflict if URL already exists
+func (s *mockStore) Save(ctx context.Context, url *db.URL) error {
+	if s.expectedData == string(url.OriginalURL) {
+		return db.ErrConflict
+	}
 	return nil
 }
 

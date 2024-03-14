@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,23 +13,14 @@ import (
 )
 
 func TestShortenJSON(t *testing.T) {
-	// we don't retrieve any data from the store
-	// handler returns newly created short URL
 	emptyMockStore := &mockStore{expectedData: ""}
-
 	path := "/api/shorten"
 
-	createJSONRequestPayload := func(url string) shortenJSONRequestPayload {
-		return shortenJSONRequestPayload{URL: url}
-	}
-
-	getJSONResponsePayload := func(r *http.Response) shortenJSONResponsePayload {
-		decoder := json.NewDecoder(r.Body)
-		defer r.Body.Close()
-		var res shortenJSONResponsePayload
-		err := decoder.Decode(&res)
-		require.NoError(t, err, "failed to read JSON body")
-		return res
+	getJSONResponsePayload := func(r *http.Response) (res shortenJSONResponsePayload) {
+		err := json.NewDecoder(r.Body).Decode(&res)
+		require.NoError(t, err, "failed to decode response JSON")
+		r.Body.Close()
+		return
 	}
 
 	getShortURL := func(s string) (res string) {
@@ -42,15 +33,19 @@ func TestShortenJSON(t *testing.T) {
 
 	tests := []struct {
 		name               string
+		method             string
 		requestContentType string
-		payload            shortenJSONRequestPayload
-		want               func(r *http.Response)
+		payload            io.Reader
+		store              *mockStore
+		assertResult       func(r *http.Response)
 	}{
 		{
 			name:               "positive test #1",
+			method:             http.MethodPost,
 			requestContentType: applicationJSON,
-			payload:            createJSONRequestPayload("https://e.mail.ru/inbox/"),
-			want: func(r *http.Response) {
+			payload:            strings.NewReader(`{"url":"https://e.mail.ru/inbox/"}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
 				defer r.Body.Close()
 				assert.Equal(t, http.StatusCreated, r.StatusCode)
 				if assert.Equal(t, applicationJSON, r.Header.Get(contentType)) {
@@ -62,9 +57,11 @@ func TestShortenJSON(t *testing.T) {
 		},
 		{
 			name:               "positive test #2",
+			method:             http.MethodPost,
 			requestContentType: applicationJSON,
-			payload:            createJSONRequestPayload("https://go.dev/"),
-			want: func(r *http.Response) {
+			payload:            strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
 				defer r.Body.Close()
 				assert.Equal(t, http.StatusCreated, r.StatusCode)
 				if assert.Equal(t, applicationJSON, r.Header.Get(contentType)) {
@@ -75,29 +72,97 @@ func TestShortenJSON(t *testing.T) {
 			},
 		},
 		{
-			name:               "negative test #1: empty URL field",
+			name:               "positive test #3: status code 409 (Conflict)",
+			method:             http.MethodPost,
 			requestContentType: applicationJSON,
-			payload:            createJSONRequestPayload(""),
-			want: func(r *http.Response) {
+			payload:            strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:              &mockStore{expectedData: "https://go.dev/"},
+			assertResult: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusConflict, r.StatusCode)
+				if assert.Equal(t, applicationJSON, r.Header.Get(contentType)) {
+					payload := getJSONResponsePayload(r)
+					shortURL := getShortURL(string(payload.Result))
+					assert.Equal(t, "eDKZ8wBC", shortURL)
+				}
+			},
+		},
+		{
+			name:               "invalid method",
+			method:             http.MethodGet,
+			requestContentType: applicationJSON,
+			payload:            strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
 				defer r.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
 				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
 					payload := getTextPayload(t, r)
-					expectedResponse := "The URL field in the JSON body of the request is empty"
+					expectedResponse := "Only POST method is allowed"
 					assert.Equal(t, expectedResponse, payload)
 				}
 			},
 		},
 		{
-			name:               "negative test #2: invalid URL",
-			requestContentType: applicationJSON,
-			payload:            createJSONRequestPayload("https://test...com"),
-			want: func(r *http.Response) {
+			name:               "invalid content-type",
+			method:             http.MethodPost,
+			requestContentType: textPlain,
+			payload:            strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
 				defer r.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
 				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
 					payload := getTextPayload(t, r)
-					expectedResponse := "The provided string is not a URL: https://test...com"
+					expectedResponse := `Only "application/json" Content-Type is allowed`
+					assert.Equal(t, expectedResponse, payload)
+				}
+			},
+		},
+		{
+			name:               "invalid payload: invalid JSON",
+			method:             http.MethodPost,
+			requestContentType: applicationJSON,
+			payload:            strings.NewReader(`{"url";"https://test.com"}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusInternalServerError, r.StatusCode)
+				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
+					payload := getTextPayload(t, r)
+					expectedResponse := `failed decode request JSON body`
+					assert.Equal(t, expectedResponse, payload)
+				}
+			},
+		},
+		{
+			name:               "invalid payload: empty url field",
+			method:             http.MethodPost,
+			requestContentType: applicationJSON,
+			payload:            strings.NewReader(`{"url":""}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
+				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
+					payload := getTextPayload(t, r)
+					expectedResponse := "url field is empty"
+					assert.Equal(t, expectedResponse, payload)
+				}
+			},
+		},
+		{
+			name:               "invalid payload: invalid url field",
+			method:             http.MethodPost,
+			requestContentType: applicationJSON,
+			payload:            strings.NewReader(`{"url":"https://test...com"}`),
+			store:              emptyMockStore,
+			assertResult: func(r *http.Response) {
+				defer r.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, r.StatusCode)
+				if assert.Equal(t, textPlain, r.Header.Get(contentType)) {
+					payload := getTextPayload(t, r)
+					expectedResponse := "Provided string is not a URL: https://test...com"
 					assert.Equal(t, expectedResponse, payload)
 				}
 			},
@@ -105,20 +170,15 @@ func TestShortenJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := json.Marshal(tt.payload)
-			require.NoError(t, err, "failed to Marshall payload")
-			payload := bytes.NewBuffer(p)
-
-			// create request with the content type and the payload being tested
-			// the method and the path are always the same
-			r := httptest.NewRequest(http.MethodPost, path, payload)
+			// create request with the method, content type and the payload being tested
+			r := httptest.NewRequest(tt.method, path, tt.payload)
 			r.Header.Set(contentType, tt.requestContentType)
 
 			// response recorder
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(emptyMockStore)
+			hctx, err := New(tt.store)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
@@ -129,7 +189,7 @@ func TestShortenJSON(t *testing.T) {
 			defer res.Body.Close()
 
 			// assert wanted result
-			tt.want(res)
+			tt.assertResult(res)
 		})
 	}
 }

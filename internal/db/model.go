@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/google/uuid"
 )
 
 type (
@@ -24,7 +25,7 @@ func (s ShortURL) MarshalJSON() ([]byte, error) {
 
 func NewRecord(shortURL, originalURL string) *URL {
 	return &URL{
-		ID:          "",
+		ID:          uuid.New().String(),
 		ShortURL:    ShortURL(shortURL),
 		OriginalURL: OriginalURL(originalURL),
 	}

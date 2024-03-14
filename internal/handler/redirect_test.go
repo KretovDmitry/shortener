@@ -15,12 +15,14 @@ import (
 func TestHandleShortURLRedirect(t *testing.T) {
 	tests := []struct {
 		name     string
+		method   string
 		shortURL string
 		store    db.URLStorage
 		want     func(res *http.Response)
 	}{
 		{
 			name:     "positive test #1",
+			method:   http.MethodGet,
 			shortURL: "be8xnp4H",
 			store:    &mockStore{expectedData: "https://e.mail.ru/inbox/"},
 			want: func(res *http.Response) {
@@ -31,6 +33,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 		},
 		{
 			name:     "positive test #2",
+			method:   http.MethodGet,
 			shortURL: "eDKZ8wBC",
 			store:    &mockStore{expectedData: "https://go.dev/"},
 			want: func(res *http.Response) {
@@ -40,7 +43,19 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			},
 		},
 		{
-			name:     "negative test #1: too long URL",
+			name:     "invalid method",
+			method:   http.MethodPost,
+			shortURL: "eDKZ8wBC",
+			store:    &mockStore{expectedData: "https://go.dev/"},
+			want: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				assert.Equal(t, `Only POST method is allowed`, getTextPayload(t, res))
+			},
+		},
+		{
+			name:     "invalid url: too long URL",
+			method:   http.MethodGet,
 			shortURL: "Too_Long_URL", // > 8 characters
 			store:    &mockStore{expectedData: ""},
 			want: func(res *http.Response) {
@@ -51,7 +66,8 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			},
 		},
 		{
-			name:     "negative test #2: too short URL",
+			name:     "invalid url: too short URL",
+			method:   http.MethodGet,
 			shortURL: "short", // < 8 characters
 			store:    &mockStore{expectedData: ""},
 			want: func(res *http.Response) {
@@ -62,7 +78,8 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			},
 		},
 		{
-			name:     "negative test #3: invalid base58 characters",
+			name:     "invalid url: invalid base58 characters",
+			method:   http.MethodGet,
 			shortURL: "O0Il0O", // 0OIl+/ are not used
 			store:    &mockStore{expectedData: ""},
 			want: func(res *http.Response) {
@@ -73,7 +90,8 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			},
 		},
 		{
-			name:     "negative test #4: no such URL",
+			name:     "no such URL",
+			method:   http.MethodGet,
 			shortURL: "2x1xx1x2",
 			store:    &mockStore{expectedData: ""},
 			want: func(res *http.Response) {
@@ -86,7 +104,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodGet, "/{shortURL}", http.NoBody)
+			r := httptest.NewRequest(tt.method, "/{shortURL}", http.NoBody)
 
 			// add context to the request so that chi can identify the dynamic part of the URL
 			rctx := chi.NewRouteContext()

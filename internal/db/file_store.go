@@ -157,6 +157,6 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
 	return nil
 }
 
-func (fs *fileStore) Ping(_ context.Context) error {
+func (fs *fileStore) Ping(context.Context) error {
 	return ErrDBNotConnected
 }

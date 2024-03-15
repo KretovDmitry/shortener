@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/db"
@@ -51,13 +52,15 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
-		h.shortenJSONError(w, "bad method", ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
+		h.shortenJSONError(w, "bad method: "+r.Method, ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
 		return
 	}
 
 	// check content type
-	if strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))) != "application/json" {
-		h.shortenJSONError(w, "bad content-type", ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
+	contentType := r.Header.Get("Content-Type")
+	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
+		h.shortenJSONError(w, "bad content-type: "+contentType,
+			ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
 		return
 	}
 
@@ -76,7 +79,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// check if URL is a valid URL
 	if !govalidator.IsURL(payload.URL) {
-		h.shortenJSONError(w, "provided url isn't valid: "+payload.URL, ErrURLIsNotProvided, http.StatusBadRequest)
+		h.shortenJSONError(w, "shorten url: "+payload.URL, ErrNotValidURL, http.StatusBadRequest)
 		return
 	}
 
@@ -92,7 +95,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
 	if err != nil && !errors.Is(err, db.ErrConflict) {
-		h.shortenJSONError(w, "failed to save to database", err, http.StatusInternalServerError)
+		h.shortenJSONError(w, "failed to save to database: "+payload.URL, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -116,11 +119,20 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// shortenJSONError encodes an error as JSON and writes it to the response.
-// If the error is a server-side error, it logs it using the provided logger.
+// shortenJSONError is a helper function that sets the appropriate response
+// headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
+	pc, _, _, ok := runtime.Caller(1)
+	details := runtime.FuncForPC(pc)
+	name := "unknown"
+	if ok && details != nil {
+		name = details.Name()
+	}
 	if code >= 500 {
-		h.logger.Error(message, zap.Error(err))
+		h.logger.Error(message, zap.Error(err), zap.String("function", name))
+	}
+	if code >= 400 && code < 500 {
+		h.logger.Info(message, zap.Error(err), zap.String("function", name))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

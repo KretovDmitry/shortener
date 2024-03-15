@@ -53,16 +53,29 @@ func (s *mockStore) Ping(context.Context) error {
 }
 
 // simulating errors with storage operations
-type brokenStore struct {
-	mockStore
-}
+type brokenStore struct{}
 
 func (s *brokenStore) Save(context.Context, *db.URL) error {
+	return errIntentionallyNotWorkingMethod
+}
+func (s *brokenStore) SaveAll(context.Context, []*db.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
 
 func (s *brokenStore) Get(context.Context, db.ShortURL) (*db.URL, error) {
 	return nil, errIntentionallyNotWorkingMethod
+}
+
+func (s *brokenStore) Ping(context.Context) error {
+	return errIntentionallyNotWorkingMethod
+}
+
+type notConnectedStore struct {
+	brokenStore
+}
+
+func (s *notConnectedStore) Ping(context.Context) error {
+	return db.ErrDBNotConnected
 }
 
 func TestNew(t *testing.T) {

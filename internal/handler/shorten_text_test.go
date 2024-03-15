@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -65,10 +66,10 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodGet,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodGet, ErrOnlyPOSTMethodIsAllowed),
 			},
 		},
 		{
@@ -76,10 +77,10 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPut,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyPOSTMethodIsAllowed),
 			},
 		},
 		{
@@ -87,10 +88,10 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPatch,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyPOSTMethodIsAllowed),
 			},
 		},
 		{
@@ -98,10 +99,10 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodDelete,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyPOSTMethodIsAllowed),
 			},
 		},
 		{
@@ -112,7 +113,7 @@ func TestShortenText(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad content-type: " + ErrOnlyTextContentType.Error(),
+				response:   fmt.Sprintf("bad content-type: %s: %s", applicationJSON, ErrOnlyTextPlainContentType),
 			},
 		},
 		{
@@ -134,7 +135,18 @@ func TestShortenText(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "body is empty: " + ErrURLIsNotProvided.Error(),
+				response:   fmt.Sprintf("body is empty: %s", ErrURLIsNotProvided),
+			},
+		},
+		{
+			name:        "invalid url",
+			method:      http.MethodPost,
+			contentType: textPlain,
+			payload:     "https://test...com",
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   fmt.Sprintf("shorten url: https://test...com: %s", ErrNotValidURL),
 			},
 		},
 		{
@@ -145,7 +157,8 @@ func TestShortenText(t *testing.T) {
 			store:       &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   "failed to save to database: intentionally not working method",
+				response: fmt.Sprintf(
+					"failed to save to database: https://go.dev/: %s", errIntentionallyNotWorkingMethod),
 			},
 		},
 	}

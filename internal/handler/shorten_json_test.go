@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -67,14 +68,50 @@ func TestShortenJSON(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "invalid method",
+			name:        "invalid method: method get",
 			method:      http.MethodGet,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad method: " + ErrOnlyPOSTMethodIsAllowed.Error(),
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodGet, ErrOnlyPOSTMethodIsAllowed),
+			},
+			wantErr: true,
+		},
+		{
+			name:        "invalid method: method put",
+			method:      http.MethodPut,
+			contentType: applicationJSON,
+			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyPOSTMethodIsAllowed),
+			},
+			wantErr: true,
+		},
+		{
+			name:        "invalid method: method patch",
+			method:      http.MethodPatch,
+			contentType: applicationJSON,
+			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyPOSTMethodIsAllowed),
+			},
+			wantErr: true,
+		},
+		{
+			name:        "invalid method: method delete",
+			method:      http.MethodDelete,
+			contentType: applicationJSON,
+			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
+			store:       emptyMockStore,
+			want: want{
+				statusCode: http.StatusBadRequest,
+				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyPOSTMethodIsAllowed),
 			},
 			wantErr: true,
 		},
@@ -86,7 +123,7 @@ func TestShortenJSON(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "bad content-type: " + ErrOnlyApplicationJSONContentType.Error(),
+				response:   fmt.Sprintf("bad content-type: %s: %s", textPlain, ErrOnlyApplicationJSONContentType),
 			},
 			wantErr: true,
 		},
@@ -110,7 +147,7 @@ func TestShortenJSON(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "url field is empty: " + ErrURLIsNotProvided.Error(),
+				response:   fmt.Sprintf("url field is empty: %s", ErrURLIsNotProvided),
 			},
 			wantErr: true,
 		},
@@ -122,19 +159,20 @@ func TestShortenJSON(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   "provided url isn't valid: https://test...com: " + ErrURLIsNotProvided.Error(),
+				response:   fmt.Sprintf("shorten url: https://test...com: %s", ErrNotValidURL),
 			},
 			wantErr: true,
 		},
 		{
-			name:        "failed to save URL to database",
+			name:        "failed to save url to database",
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
 			store:       &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   "failed to save to database: intentionally not working method",
+				response: fmt.Sprintf(
+					"failed to save to database: https://go.dev/: %s", errIntentionallyNotWorkingMethod),
 			},
 			wantErr: true,
 		},
@@ -166,8 +204,10 @@ func TestShortenJSON(t *testing.T) {
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
 			case tt.wantErr:
+				assert.Equal(t, tt.wantErr, !response.Success)
 				assert.True(t, strings.Contains(response.Message, tt.want.response))
 			case !tt.wantErr:
+				assert.Equal(t, !tt.wantErr, response.Success)
 				assert.Equal(t, tt.want.response, getShortURL(string(response.Result)))
 			}
 		})

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"runtime"
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/db"
@@ -27,6 +26,8 @@ type (
 )
 
 // ShortenJSON handles the shortening of a long URL.
+// The message field should be set to an error message if the shortening failed.
+// Otherwise, success should be set to true and the result field should contain the shortened URL.
 //
 // Request:
 //
@@ -122,17 +123,11 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 // shortenJSONError is a helper function that sets the appropriate response
 // headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
-	pc, _, _, ok := runtime.Caller(1)
-	details := runtime.FuncForPC(pc)
-	name := "unknown"
-	if ok && details != nil {
-		name = details.Name()
-	}
 	if code >= 500 {
-		h.logger.Error(message, zap.Error(err), zap.String("function", name))
+		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
 	}
 	if code >= 400 && code < 500 {
-		h.logger.Info(message, zap.Error(err), zap.String("function", name))
+		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

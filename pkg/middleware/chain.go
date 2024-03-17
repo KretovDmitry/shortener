@@ -1,8 +1,13 @@
 package middleware
 
-import "net/http"
+import (
+	"net/http"
+
+	"go.uber.org/zap"
+)
 
 type Middleware func(http.HandlerFunc) http.HandlerFunc
+type MiddlewareWithLogger func(logger *zap.Logger) func(http.HandlerFunc) http.HandlerFunc
 
 // BuildChain applies middlewares to a http.HandlerFunc
 func BuildChain(m ...Middleware) Middleware {

@@ -128,9 +128,13 @@ func (fs *fileStore) Save(ctx context.Context, url *URL) error {
 	return fs.cache.Save(url)
 }
 
+// SaveAll saves multiple URL records to the file and cache.
+// If a record already exists in the cache, it is skipped
+// because it has already been read from the file during initialization.
+// If writing to the file is required, the record is also written to the file.
 func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
 	for _, url := range urls {
-		// checking if the record already exists in the cache
+		// check if the record already exists in the cache
 		record, err := fs.cache.Get(ctx, url.ShortURL)
 		if err != nil && !errors.Is(err, ErrURLNotFound) {
 			return err
@@ -157,6 +161,7 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
 	return nil
 }
 
+// fileStore Ping method tells that the real database is not connected.
 func (fs *fileStore) Ping(context.Context) error {
 	return ErrDBNotConnected
 }

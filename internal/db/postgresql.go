@@ -72,14 +72,14 @@ func bootstrap(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("create url table: %w", err)
 	}
 
-	// create the short_url_idx index if it does not exist
+	// create the short_url index if it does not exist
 	if _, err := tx.Exec(ctx, `
 		CREATE UNIQUE INDEX IF NOT EXISTS short_url ON url (short_url)
 		`); err != nil {
 		return fmt.Errorf("create short_url index: %w", err)
 	}
 
-	// create the original_url_idx index if it does not exist
+	// create the original_url index if it does not exist
 	if _, err := tx.Exec(ctx, `
 		CREATE UNIQUE INDEX IF NOT EXISTS original_url ON url (original_url)
 		`); err != nil {
@@ -92,7 +92,7 @@ func bootstrap(ctx context.Context, pool *pgxpool.Pool) error {
 // Save saves a new URL record to the database.
 // If a URL record already exists, ErrConflict is returned.
 func (pg *postgresStore) Save(ctx context.Context, u *URL) error {
-	q := `
+	const q = `
         INSERT INTO url
             (short_url, original_url)
         VALUES
@@ -129,7 +129,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, u []*URL) error {
 	}
 	defer tx.Rollback(ctx)
 
-	q := `
+	const q = `
         INSERT INTO url 
             (short_url, original_url)
         VALUES
@@ -160,7 +160,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, u []*URL) error {
 // Get retrieves a URL record from the database based on its short URL.
 // If the URL record does not exist, ErrURLNotFound is returned.
 func (pg *postgresStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
-	q := `
+	const q = `
 		SELECT
 			id, short_url, original_url
 		FROM

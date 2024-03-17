@@ -2,12 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
+	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
 )
 
@@ -56,46 +56,51 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	defer h.logger.Sync()
 
-	// Check the request method.
+	// check the request method
 	if r.Method != http.MethodPost {
-		// Yandex Practicum technical specification requires
-		// using a status code of 400 Bad Request instead of 405 Method Not Allowed.
-		h.logger.Info("got request with bad method", zap.String("method", r.Method))
-		http.Error(w, `Only POST method is allowed`, http.StatusBadRequest)
+		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
+		h.textError(w, "bad method: "+r.Method, ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
 		return
 	}
 
-	// Check the content type.
-	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
-	if contentType != "application/json" {
-		h.logger.Info("got request with bad content-type",
-			zap.String("content-type", r.Header.Get("Content-Type")))
-		msg := `Only "application/json" Content-Type is allowed`
-		http.Error(w, msg, http.StatusBadRequest)
+	// check content type
+	contentType := r.Header.Get("Content-Type")
+	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
+		h.textError(w, "bad content-type: "+contentType, ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
 		return
 	}
 
-	// Decode the request body.
+	// decode the request body
 	var payload []shortenBatchRequestPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		msg := "failed to decode request JSON body"
-		h.logger.Error(msg, zap.Error(err))
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.textError(w, "failed to decode request", err, http.StatusInternalServerError)
 		return
 	}
 
 	h.logger.Debug("received batch request", zap.Int("count", len(payload)))
 
-	// Prepare the records to save and send.
+	// prepare the records to save and send
 	recordsToSave := make([]*db.URL, len(payload))
 	result := make([]shortenBatchResponsePayload, len(payload))
+
 	for i, p := range payload {
+
+		// check if URL is provided
+		if len(p.OriginalURL) == 0 {
+			h.textError(w, "url field is empty", ErrURLIsNotProvided, http.StatusBadRequest)
+			return
+		}
+
+		// check if URL is a valid URL
+		if !govalidator.IsURL(p.OriginalURL) {
+			h.textError(w, "shorten url: "+p.OriginalURL, ErrNotValidURL, http.StatusBadRequest)
+			return
+		}
+
 		// generate short URL
 		shortURL, err := shorturl.Generate(p.OriginalURL)
 		if err != nil {
-			msg := fmt.Sprintf("failed to generate short URL: %s", p.OriginalURL)
-			h.logger.Error(msg, zap.Error(err))
-			http.Error(w, msg, http.StatusInternalServerError)
+			h.textError(w, "failed to shorten url: "+p.OriginalURL, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -105,23 +110,20 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Debug("saving batch of records", zap.Int("count", len(recordsToSave)))
 
-	// Save the records.
+	// save the records
 	if err := h.store.SaveAll(r.Context(), recordsToSave); err != nil {
-		msg := "failed to save records"
-		h.logger.Error(msg, zap.Error(err))
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.textError(w, "failed to save to database", err, http.StatusInternalServerError)
 		return
 	}
 
-	// Set the response headers and status code.
+	// set the response headers and status code
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	// Encode the response body.
+	// encode the response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		msg := "failed to encode the body of the JSON response"
-		h.logger.Error(msg, zap.Error(err))
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.logger.Error("failed to encode response", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }

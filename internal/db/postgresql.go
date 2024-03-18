@@ -99,15 +99,15 @@ func (pg *postgresStore) Save(ctx context.Context, u *URL) error {
             ($1, $2)
     `
 
-	// Query the database to insert the URL record.
+	// query the database to insert the URL record
 	if _, err := pg.store.Exec(ctx, q, u.ShortURL, u.OriginalURL); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			// return ErrConflict if the record already exists.
+			// return ErrConflict if the record already exists
 			if pgErr.Code == pgerrcode.UniqueViolation {
 				return ErrConflict
 			}
-			// Create a new error with additional context.
+			// create a new error with additional context
 			return fmt.Errorf("save url with query (%s): %w",
 				formatQuery(q), formatPgError(pgErr),
 			)
@@ -140,11 +140,11 @@ func (pg *postgresStore) SaveAll(ctx context.Context, u []*URL) error {
 		if _, err := tx.Exec(ctx, q, url.ShortURL, url.OriginalURL); err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
-				// continue if the record already exists.
+				// continue if the record already exists
 				if pgErr.Code == pgerrcode.UniqueViolation {
 					continue
 				}
-				// Create a new error with additional context.
+				// create a new error with additional context
 				return fmt.Errorf("save url with query (%s): %w",
 					formatQuery(q), formatPgError(pgErr),
 				)

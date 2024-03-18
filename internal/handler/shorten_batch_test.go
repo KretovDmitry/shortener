@@ -7,13 +7,37 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenText(t *testing.T) {
-	path := "/"
+func TestShortenBatch(t *testing.T) {
+	path := "/api/shorten/batch"
+
+	const goodPayload = `
+	[
+		{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":"https://e.mail.ru/inbox/"}
+	]`
+
+	happyResponse := fmt.Sprintf(`[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/eDKZ8wBC"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://%[1]s/be8xnp4H"}]`,
+		config.AddrToReturn)
+
+	const invalidJSON = `
+	[
+		"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":"https://e.mail.ru/inbox/"}
+	]`
+
+	const emptyURL = `
+	[
+		{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":""}
+	]`
+
+	const invalidURL = `
+	[
+		{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":"https://test...com"}
+	]`
 
 	type want struct {
 		statusCode int
@@ -27,45 +51,35 @@ func TestShortenText(t *testing.T) {
 		payload     string
 		store       db.URLStorage
 		want        want
+		wantErr     bool
 	}{
 		{
 			name:        "positive test #1",
 			method:      http.MethodPost,
-			contentType: textPlain,
-			payload:     "https://e.mail.ru/inbox/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusCreated,
-				response:   "be8xnp4H",
+				response:   happyResponse,
 			},
 		},
 		{
 			name:        "positive test #2",
 			method:      http.MethodPost,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
-			store:       emptyMockStore,
-			want: want{
-				statusCode: http.StatusCreated,
-				response:   "eDKZ8wBC",
-			},
-		},
-		{
-			name:        "positive test #3: status code 409 (Conflict)",
-			method:      http.MethodPost,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       &mockStore{expectedData: "https://go.dev/"},
 			want: want{
-				statusCode: http.StatusConflict,
-				response:   "eDKZ8wBC",
+				statusCode: http.StatusCreated,
+				response:   happyResponse,
 			},
 		},
 		{
 			name:        "invalid method: method get",
 			method:      http.MethodGet,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -75,8 +89,8 @@ func TestShortenText(t *testing.T) {
 		{
 			name:        "invalid method: method put",
 			method:      http.MethodPut,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -86,8 +100,8 @@ func TestShortenText(t *testing.T) {
 		{
 			name:        "invalid method: method patch",
 			method:      http.MethodPatch,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -97,8 +111,8 @@ func TestShortenText(t *testing.T) {
 		{
 			name:        "invalid method: method delete",
 			method:      http.MethodDelete,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -106,43 +120,56 @@ func TestShortenText(t *testing.T) {
 			},
 		},
 		{
-			name:        "invalid content-type: application/json",
+			name:        "invalid content-type: text/plain",
 			method:      http.MethodPost,
-			contentType: applicationJSON,
-			payload:     "https://go.dev/",
+			contentType: textPlain,
+			payload:     goodPayload,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad content-type: %s: %s", applicationJSON, ErrOnlyTextPlainContentType),
+				response:   fmt.Sprintf("bad content-type: %s: %s", textPlain, ErrOnlyApplicationJSONContentType),
 			},
 		},
 		{
-			name:        "text plain with some charset: utf-16",
+			name:        "invalid JSON",
 			method:      http.MethodPost,
-			contentType: "text/plain; charset=utf-16",
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     invalidJSON,
 			store:       emptyMockStore,
 			want: want{
-				statusCode: http.StatusCreated,
-				response:   "eDKZ8wBC",
+				statusCode: http.StatusInternalServerError,
+				response:   "failed to decode request",
 			},
+			wantErr: true,
 		},
 		{
 			name:        "empty body",
 			method:      http.MethodPost,
-			contentType: textPlain,
+			contentType: applicationJSON,
 			payload:     "",
 			store:       emptyMockStore,
 			want: want{
+				statusCode: http.StatusInternalServerError,
+				response:   "failed to decode request",
+			},
+			wantErr: true,
+		},
+		{
+			name:        "empty url",
+			method:      http.MethodPost,
+			contentType: applicationJSON,
+			payload:     emptyURL,
+			store:       emptyMockStore,
+			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("body is empty: %s", ErrURLIsNotProvided),
+				response:   fmt.Sprintf("url field is empty: %s", ErrURLIsNotProvided),
 			},
 		},
 		{
 			name:        "invalid url",
 			method:      http.MethodPost,
-			contentType: textPlain,
-			payload:     "https://test...com",
+			contentType: applicationJSON,
+			payload:     invalidURL,
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
@@ -152,13 +179,12 @@ func TestShortenText(t *testing.T) {
 		{
 			name:        "failed to save URL to database",
 			method:      http.MethodPost,
-			contentType: textPlain,
-			payload:     "https://go.dev/",
+			contentType: applicationJSON,
+			payload:     goodPayload,
 			store:       &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response: fmt.Sprintf(
-					"failed to save to database: https://go.dev/: %s", errIntentionallyNotWorkingMethod),
+				response:   fmt.Sprintf("failed to save to database: %s", errIntentionallyNotWorkingMethod),
 			},
 		},
 	}
@@ -172,21 +198,21 @@ func TestShortenText(t *testing.T) {
 			hctx, err := New(tt.store)
 			require.NoError(t, err, "new handler context error")
 
-			hctx.ShortenText(w, r)
+			hctx.ShortenBatch(w, r)
 
 			res := w.Result()
 
 			response := getResponseTextPayload(t, res)
 			res.Body.Close()
 
-			// if response contains URL (positive scenarios), take only short URL
-			if strings.HasPrefix(response, "http") {
-				response = getShortURL(response)
+			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+			switch {
+			case tt.wantErr:
+				assert.True(t, strings.Contains(response, tt.want.response))
+			case !tt.wantErr:
+				assert.Equal(t, tt.want.response, response)
 			}
 
-			assert.Equal(t, tt.want.statusCode, res.StatusCode)
-			assert.Equal(t, textPlain, res.Header.Get(contentType))
-			assert.Equal(t, tt.want.response, response)
 		})
 	}
 }

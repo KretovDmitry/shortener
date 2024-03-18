@@ -77,7 +77,9 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	for {
 		record, err := consumer.ReadRecord()
 		if record != nil {
-			fileStore.cache.Save(record)
+			if err = fileStore.cache.Save(record); err != nil {
+				return nil, fmt.Errorf("save record: %w", err)
+			}
 		}
 		if err == io.EOF {
 			break
@@ -106,7 +108,7 @@ func (fs *fileStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
 }
 
 func (fs *fileStore) Save(ctx context.Context, url *URL) error {
-	// checking if the record already exists in the cache
+	// check if the record already exists in the cache
 	record, err := fs.cache.Get(ctx, url.ShortURL)
 	if err != nil && !errors.Is(err, ErrURLNotFound) {
 		return err
@@ -129,9 +131,6 @@ func (fs *fileStore) Save(ctx context.Context, url *URL) error {
 }
 
 // SaveAll saves multiple URL records to the file and cache.
-// If a record already exists in the cache, it is skipped
-// because it has already been read from the file during initialization.
-// If writing to the file is required, the record is also written to the file.
 func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
 	for _, url := range urls {
 		// check if the record already exists in the cache

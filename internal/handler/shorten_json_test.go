@@ -179,28 +179,21 @@ func TestShortenJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// create request with the method, content type and the payload being tested
 			r := httptest.NewRequest(tt.method, path, tt.payload)
 			r.Header.Set(contentType, tt.contentType)
 
-			// response recorder
 			w := httptest.NewRecorder()
 
-			// context with mock store, stop test if failed to init context
 			hctx, err := New(tt.store)
 			require.NoError(t, err, "new handler context error")
 
-			// call the handler
 			hctx.ShortenJSON(w, r)
 
-			// get recorded data
 			res := w.Result()
 
-			// decode the response, stop if could not decode
 			response := getShortenJSONResponsePayload(t, res)
 			res.Body.Close()
 
-			// assert wanted result
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
 			case tt.wantErr:

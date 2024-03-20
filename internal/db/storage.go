@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
@@ -14,12 +13,6 @@ type URLStorage interface {
 	Get(context.Context, ShortURL) (*URL, error)
 	Ping(context.Context) error
 }
-
-var (
-	ErrURLNotFound    = errors.New("URL not found")
-	ErrDBNotConnected = errors.New("database not connected")
-	ErrConflict       = errors.New("data conflict")
-)
 
 // NewStore creates a new instance of URLStorage based on the configuration
 func NewStore(ctx context.Context) (URLStorage, error) {

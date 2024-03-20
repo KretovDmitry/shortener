@@ -2,105 +2,70 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/KretovDmitry/shortener/pkg/retries"
+	"github.com/avast/retry-go/v4"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 )
 
 type postgresStore struct {
-	store *pgxpool.Pool
+	store *sql.DB
 }
 
 // NewPostgresStore creates a new Postgres database connection pool
 // and initializes the database schema.
 func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
 	var (
-		maxAttempts = 3
-		pool        *pgxpool.Pool
-		err         error
+		DB  *sql.DB
+		err error
 	)
 
-	// try to connect to the database several times
-	err = retries.Do(func() error {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-
-		if pool, err = pgxpool.New(ctx, dsn); err != nil {
-			return fmt.Errorf("unable to create connection pool: %w", err)
+	err = retry.Do(func() error {
+		DB, err = goose.OpenDBWithDriver("pgx", dsn)
+		if err != nil {
+			return err
 		}
 
 		return nil
-	}, maxAttempts, 5*time.Second)
+	},
+		retry.Context(ctx),
+		retry.Attempts(3),
+		retry.Delay(1*time.Second),
+	)
 
 	if err != nil {
-		return nil, fmt.Errorf("new postgresql client: %w", err)
+		return nil, fmt.Errorf("goose: failed to open DB: %v", err)
 	}
 
-	// initialize the database schema
-	if err = bootstrap(ctx, pool); err != nil {
-		return nil, fmt.Errorf("bootstrap: %w", err)
-	}
-
-	return &postgresStore{
-		store: pool,
-	}, nil
-}
-
-// bootstrap initializes the database schema.
-func bootstrap(ctx context.Context, pool *pgxpool.Pool) error {
-	tx, err := pool.Begin(ctx)
+	err = goose.Up(DB, ".")
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	// create the "url" table if it does not exist
-	if _, err := tx.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS public.url (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			short_url VARCHAR(8) NOT NULL UNIQUE,
-			original_url VARCHAR(255) NOT NULL UNIQUE
-		);
-	`); err != nil {
-		return fmt.Errorf("create url table: %w", err)
+		return nil, fmt.Errorf("goose: failed to migrate DB: %v", err)
 	}
 
-	// create the short_url index if it does not exist
-	if _, err := tx.Exec(ctx, `
-		CREATE UNIQUE INDEX IF NOT EXISTS short_url ON url (short_url)
-		`); err != nil {
-		return fmt.Errorf("create short_url index: %w", err)
-	}
-
-	// create the original_url index if it does not exist
-	if _, err := tx.Exec(ctx, `
-		CREATE UNIQUE INDEX IF NOT EXISTS original_url ON url (original_url)
-		`); err != nil {
-		return fmt.Errorf("create original_url index: %w", err)
-	}
-
-	return tx.Commit(ctx)
+	return &postgresStore{store: DB}, nil
 }
 
 // Save saves a new URL record to the database.
 // If a URL record already exists, ErrConflict is returned.
 func (pg *postgresStore) Save(ctx context.Context, u *URL) error {
 	const q = `
-        INSERT INTO url
-            (short_url, original_url)
-        VALUES
-            ($1, $2)
-    `
+		INSERT INTO url
+			(id, short_url, original_url)
+		VALUES
+			($1, $2, $3)
+	`
 
 	// query the database to insert the URL record
-	if _, err := pg.store.Exec(ctx, q, u.ShortURL, u.OriginalURL); err != nil {
+	_, err := pg.store.ExecContext(ctx, q, u.ID, u.ShortURL, u.OriginalURL)
+	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			// return ErrConflict if the record already exists
@@ -122,22 +87,28 @@ func (pg *postgresStore) Save(ctx context.Context, u *URL) error {
 // SaveAll saves multiple URL records to the database in a single transaction.
 // If a URL record already exists, the record is not inserted.
 // If the transaction fails, all changes are rolled back.
-func (pg *postgresStore) SaveAll(ctx context.Context, u []*URL) error {
-	tx, err := pg.store.Begin(ctx)
+func (pg *postgresStore) SaveAll(ctx context.Context, urls []*URL) error {
+	const q = `
+        INSERT INTO url 
+            (id, short_url, original_url)
+        VALUES
+            ($1, $2, $3)
+    `
+
+	tx, err := pg.store.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback()
 
-	const q = `
-        INSERT INTO url 
-            (short_url, original_url)
-        VALUES
-            ($1, $2)
-    `
+	stmt, err := tx.PrepareContext(ctx, q)
+	if err != nil {
+		return fmt.Errorf("prepare statement: %w", err)
+	}
 
-	for _, url := range u {
-		if _, err := tx.Exec(ctx, q, url.ShortURL, url.OriginalURL); err != nil {
+	for _, url := range urls {
+		_, err := stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL)
+		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
 				// continue if the record already exists
@@ -154,7 +125,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, u []*URL) error {
 		}
 	}
 
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 // Get retrieves a URL record from the database based on its short URL.
@@ -167,10 +138,11 @@ func (pg *postgresStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
 			url
 		WHERE
 			short_url = $1
-		`
+	`
 
 	u := new(URL)
-	if err := pg.store.QueryRow(ctx, q, sURL).Scan(&u.ID, &u.ShortURL, &u.OriginalURL); err != nil {
+	err := pg.store.QueryRowContext(ctx, q, sURL).Scan(&u.ID, &u.ShortURL, &u.OriginalURL)
+	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrURLNotFound
 		}
@@ -190,7 +162,7 @@ func (pg *postgresStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
 
 // Ping verifies the connection to the database is alive.
 func (pg *postgresStore) Ping(ctx context.Context) error {
-	return pg.store.Ping(ctx)
+	return pg.store.PingContext(ctx)
 }
 
 // formatQuery removes tabs and replaces newlines with spaces in the given query string.

@@ -2,10 +2,17 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/google/uuid"
+)
+
+var (
+	ErrURLNotFound    = errors.New("URL not found")
+	ErrDBNotConnected = errors.New("database not connected")
+	ErrConflict       = errors.New("data conflict")
 )
 
 type (

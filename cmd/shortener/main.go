@@ -13,6 +13,7 @@ import (
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
+	_ "github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )

@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,16 +15,18 @@ import (
 
 func TestHandleShortURLRedirect(t *testing.T) {
 	tests := []struct {
-		name     string
-		shortURL string
-		store    URLStore
-		want     func(res *http.Response)
+		name           string
+		method         string
+		shortURL       string
+		store          db.URLStorage
+		assertResponse func(res *http.Response)
 	}{
 		{
 			name:     "positive test #1",
+			method:   http.MethodGet,
 			shortURL: "be8xnp4H",
 			store:    &mockStore{expectedData: "https://e.mail.ru/inbox/"},
-			want: func(res *http.Response) {
+			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 				assert.Equal(t, "https://e.mail.ru/inbox/", res.Header.Get("Location"))
@@ -30,62 +34,131 @@ func TestHandleShortURLRedirect(t *testing.T) {
 		},
 		{
 			name:     "positive test #2",
+			method:   http.MethodGet,
 			shortURL: "eDKZ8wBC",
 			store:    &mockStore{expectedData: "https://go.dev/"},
-			want: func(res *http.Response) {
+			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 				assert.Equal(t, "https://go.dev/", res.Header.Get("Location"))
 			},
 		},
 		{
-			name:     "negative test #1: too long URL",
+			name:     "invalid method: method post",
+			method:   http.MethodPost,
+			shortURL: "eDKZ8wBC",
+			store:    &mockStore{expectedData: "https://go.dev/"},
+			assertResponse: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				assert.Equal(t,
+					fmt.Sprintf("bad method: %s: %s", http.MethodPost, ErrOnlyGETMethodIsAllowed), getResponseTextPayload(t, res))
+			},
+		},
+		{
+			name:     "invalid method: method put",
+			method:   http.MethodPut,
+			shortURL: "eDKZ8wBC",
+			store:    &mockStore{expectedData: "https://go.dev/"},
+			assertResponse: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				assert.Equal(t,
+					fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyGETMethodIsAllowed),
+					getResponseTextPayload(t, res))
+			},
+		},
+		{
+			name:     "invalid method: method patch",
+			method:   http.MethodPatch,
+			shortURL: "eDKZ8wBC",
+			store:    &mockStore{expectedData: "https://go.dev/"},
+			assertResponse: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				assert.Equal(t,
+					fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyGETMethodIsAllowed),
+					getResponseTextPayload(t, res))
+			},
+		},
+		{
+			name:     "invalid method: method delete",
+			method:   http.MethodDelete,
+			shortURL: "eDKZ8wBC",
+			store:    &mockStore{expectedData: "https://go.dev/"},
+			assertResponse: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+				assert.Equal(t,
+					fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyGETMethodIsAllowed),
+					getResponseTextPayload(t, res))
+			},
+		},
+		{
+			name:     "invalid url: too long URL",
+			method:   http.MethodGet,
 			shortURL: "Too_Long_URL", // > 8 characters
 			store:    &mockStore{expectedData: ""},
-			want: func(res *http.Response) {
+			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
-				assert.Equal(t, "Invalid URL: Too_Long_URL", resBody)
+				resBody := getResponseTextPayload(t, res)
+				assert.Equal(t, fmt.Sprintf("redirect with url: Too_Long_URL: %s", ErrNotValidURL), resBody)
 			},
 		},
 		{
-			name:     "negative test #2: too short URL",
+			name:     "invalid url: too short URL",
+			method:   http.MethodGet,
 			shortURL: "short", // < 8 characters
 			store:    &mockStore{expectedData: ""},
-			want: func(res *http.Response) {
+			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
-				assert.Equal(t, "Invalid URL: short", resBody)
+				resBody := getResponseTextPayload(t, res)
+				assert.Equal(t, fmt.Sprintf("redirect with url: short: %s", ErrNotValidURL), resBody)
 			},
 		},
 		{
-			name:     "negative test #3: invalid base58 characters",
+			name:     "invalid url: invalid base58 characters",
+			method:   http.MethodGet,
 			shortURL: "O0Il0O", // 0OIl+/ are not used
 			store:    &mockStore{expectedData: ""},
-			want: func(res *http.Response) {
+			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
-				assert.Equal(t, "Invalid URL: O0Il0O", resBody)
+				resBody := getResponseTextPayload(t, res)
+				assert.Equal(t, fmt.Sprintf("redirect with url: O0Il0O: %s", ErrNotValidURL), resBody)
 			},
 		},
 		{
-			name:     "negative test #4: no such URL",
+			name:     "no such URL",
+			method:   http.MethodGet,
 			shortURL: "2x1xx1x2",
 			store:    &mockStore{expectedData: ""},
-			want: func(res *http.Response) {
+			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getTextPayload(t, res)
-				assert.Equal(t, "No such URL: 2x1xx1x2", resBody)
+				resBody := getResponseTextPayload(t, res)
+				assert.Equal(t, fmt.Sprintf("redirect with url: 2x1xx1x2: %s", db.ErrURLNotFound), resBody)
+			},
+		},
+		{
+			name:     "failed to get url from database",
+			method:   http.MethodGet,
+			shortURL: "2x1xx1x2",
+			store:    &brokenStore{},
+			assertResponse: func(res *http.Response) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
+				resBody := getResponseTextPayload(t, res)
+				assert.Equal(t,
+					fmt.Sprintf("failed to retrieve url: 2x1xx1x2: %s", errIntentionallyNotWorkingMethod), resBody)
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodGet, "/{shortURL}", http.NoBody)
+			r := httptest.NewRequest(tt.method, "/{shortURL}", http.NoBody)
 
 			// add context to the request so that chi can identify the dynamic part of the URL
 			rctx := chi.NewRouteContext()
@@ -97,11 +170,11 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := NewHandlerContext(tt.store)
+			hctx, err := New(tt.store)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			hctx.HandleShortURLRedirect(w, r)
+			hctx.Redirect(w, r)
 
 			// get recorded data
 			res := w.Result()
@@ -109,7 +182,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 
 			// assert wanted data
 			assert.Equal(t, textPlain, res.Header.Get(contentType))
-			tt.want(res)
+			tt.assertResponse(res)
 		})
 	}
 }

@@ -1,66 +1,97 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/KretovDmitry/shortener/internal/cfg"
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
+	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
 )
 
-func (ctx *handlerContext) ShortenText(w http.ResponseWriter, r *http.Request) {
-	l := logger.Get()
-	defer l.Sync()
+func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
+	defer h.logger.Sync()
+	defer r.Body.Close()
 
-	if r.Header.Get("Content-Encoding") == "" {
-		contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
-		if i := strings.Index(contentType, ";"); i > -1 {
-			contentType = contentType[0:i]
-		}
-		if contentType != "text/plain" {
-			msg := `Only "text/plain" Content-Type is allowed`
-			http.Error(w, msg, http.StatusBadRequest)
-			return
-		}
-	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		l.Error("failed to read request body", zap.Error(err))
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		http.Error(w, msg, http.StatusInternalServerError)
+	// check request method
+	if r.Method != http.MethodPost {
+		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
+		h.textError(w, "bad method: "+r.Method, ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
 		return
 	}
-	r.Body.Close()
 
+	// check if content type is valid
+	contentType := r.Header.Get("Content-Type")
+	if r.Header.Get("Content-Encoding") == "" && !isTextPlainContentType(contentType) {
+		h.textError(w, "bad content-type: "+contentType, ErrOnlyTextPlainContentType, http.StatusBadRequest)
+		return
+	}
+
+	// read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.textError(w, "failed to read request body", err, http.StatusInternalServerError)
+		return
+	}
+
+	// check if URL is provided
 	if len(body) == 0 {
-		http.Error(w, "Empty body, must contain URL", http.StatusBadRequest)
+		h.textError(w, "body is empty", ErrURLIsNotProvided, http.StatusBadRequest)
 		return
 	}
 
 	originalURL := string(body)
 
-	shortURL, err := shorturl.Generate(originalURL)
+	// check if URL is a valid URL
+	if !govalidator.IsURL(originalURL) {
+		h.textError(w, "shorten url: "+originalURL, ErrNotValidURL, http.StatusBadRequest)
+		return
+	}
+
+	// generate short URL
+	generatedShortURL, err := shorturl.Generate(originalURL)
 	if err != nil {
-		l.Error("failed to generate short URL", zap.Error(err))
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		http.Error(w, msg, http.StatusInternalServerError)
+		h.textError(w, "failed to shorten url: "+originalURL, err, http.StatusInternalServerError)
 		return
 	}
 
-	if err := ctx.store.SaveURL(db.ShortURL(shortURL), db.OriginalURL(originalURL)); err != nil {
-		l.Error("failed to save URL", zap.Error(err))
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		http.Error(w, msg, http.StatusInternalServerError)
+	newRecord := db.NewRecord(generatedShortURL, originalURL)
+
+	// save URL to database
+	err = h.store.Save(r.Context(), newRecord)
+	if err != nil && !errors.Is(err, db.ErrConflict) {
+		h.textError(w, "failed to save to database: "+originalURL, err, http.StatusInternalServerError)
 		return
 	}
 
+	// Set the response headers and status code
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf("http://%s/%s", cfg.AddrToReturn, shortURL)))
+	switch {
+	case errors.Is(err, db.ErrConflict):
+		w.WriteHeader(http.StatusConflict)
+	default:
+		w.WriteHeader(http.StatusCreated)
+	}
+
+	// write response body
+	_, err = w.Write([]byte(fmt.Sprintf("http://%s/%s", config.AddrToReturn, generatedShortURL)))
+	if err != nil {
+		h.logger.Error("failed to write response", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// isTextPlainContentType returns true if content type is text/plain
+func isTextPlainContentType(contentType string) bool {
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	if i := strings.Index(contentType, ";"); i > -1 {
+		contentType = contentType[0:i]
+	}
+	return contentType == "text/plain"
 }

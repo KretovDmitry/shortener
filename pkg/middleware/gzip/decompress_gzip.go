@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/KretovDmitry/shortener/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -41,26 +40,24 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
-// Unzip decides whether or not to decompress request
-// judging by content encoding
-func Unzip(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		l := logger.Get()
-		defer l.Sync()
-
-		contentEncoding := r.Header.Get("Content-Encoding")
-		sendsGzip := strings.Contains(contentEncoding, "gzip")
-		if sendsGzip {
-			cr, err := newCompressReader(r.Body)
-			if err != nil {
-				l.Error("new compress reader", zap.Error(err))
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+// Unzip decides whether or not to decompress request judging by content encoding.
+func Unzip(logger *zap.Logger) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			contentEncoding := r.Header.Get("Content-Encoding")
+			sendsGzip := strings.Contains(contentEncoding, "gzip")
+			if sendsGzip {
+				cr, err := newCompressReader(r.Body)
+				if err != nil {
+					logger.Error("new compress reader", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				r.Body = cr
+				defer cr.Close()
 			}
-			r.Body = cr
-			defer cr.Close()
-		}
 
-		next(w, r)
+			next(w, r)
+		}
 	}
 }

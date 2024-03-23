@@ -9,13 +9,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestUnzip(t *testing.T) {
 	var handler http.HandlerFunc = (func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		body, err := io.ReadAll(r.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		r.Body.Close()
 		w.Write(body)
 	})
@@ -42,7 +44,7 @@ func TestUnzip(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			r.Header.Set("Content-Encoding", tt.contentEncoding)
-			handler = Unzip(handler)
+			handler = Unzip(zap.L())(handler)
 
 			handler(w, r)
 

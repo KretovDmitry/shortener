@@ -1,4 +1,4 @@
-package cfg
+package config
 
 import (
 	"errors"
@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	defaultHost = "0.0.0.0"
-	defaultPort = 8080
+	defaultHost     = "0.0.0.0"
+	defaultPort     = 8080
+	defaultFileName = "short-url-db.json"
 )
 
 type netAddress struct {
@@ -60,7 +61,6 @@ type fileStorage struct {
 }
 
 func NewFileStorage() *fileStorage {
-	const defaultFileName = "short-url-db.json"
 	tmp := os.TempDir()
 	return &fileStorage{
 		path:          path.Join(tmp, defaultFileName),
@@ -95,6 +95,7 @@ var (
 	AddrToRun    = NewNetAddress()
 	AddrToReturn = NewNetAddress()
 	FileStorage  = NewFileStorage()
+	DSN          string
 	LogLevel     string
 )
 
@@ -102,30 +103,32 @@ func ParseFlags() error {
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
-	flag.Var(FileStorage, "f", "file storage path")
-	flag.StringVar(&LogLevel, "l", "info", "log level")
+	flag.Var(FileStorage, "f", "File storage path")
+	flag.StringVar(&DSN, "d", "", "Data source name in form postgres URL or DSN string")
+	flag.StringVar(&LogLevel, "l", "info", "Log level")
 	flag.Parse()
 
 	// ENV variables have the highest priority
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
-		err := AddrToRun.Set(envRunAddr)
-		if err != nil {
+		if err := AddrToRun.Set(envRunAddr); err != nil {
 			return fmt.Errorf("invalid SERVER_ADDRESS: %w", err)
 		}
 	}
 
 	if envReturnAddr := os.Getenv("BASE_URL"); envReturnAddr != "" {
-		err := AddrToReturn.Set(envReturnAddr)
-		if err != nil {
+		if err := AddrToReturn.Set(envReturnAddr); err != nil {
 			return fmt.Errorf("invalid BASE_URL: %w", err)
 		}
 	}
 
 	if envFileStoragePath, set := os.LookupEnv("FILE_STORAGE_PATH"); set {
-		err := FileStorage.Set(envFileStoragePath)
-		if err != nil {
+		if err := FileStorage.Set(envFileStoragePath); err != nil {
 			return fmt.Errorf("invalid FILE_STORAGE_PATH: %w", err)
 		}
+	}
+
+	if envDSN := os.Getenv("DATABASE_DSN"); envDSN != "" {
+		DSN = envDSN
 	}
 
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {

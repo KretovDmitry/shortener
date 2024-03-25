@@ -32,7 +32,7 @@ func (s ShortURL) MarshalJSON() ([]byte, error) {
 
 func NewRecord(shortURL, originalURL string) *URL {
 	return &URL{
-		ID:          uuid.New().String(),
+		ID:          uuid.NewString(),
 		ShortURL:    ShortURL(shortURL),
 		OriginalURL: OriginalURL(originalURL),
 	}

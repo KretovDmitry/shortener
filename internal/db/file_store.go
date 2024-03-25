@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/models"
 )
 
 type Producer struct {
@@ -28,7 +29,7 @@ func NewProducer(fileName string) (*Producer, error) {
 	}, nil
 }
 
-func (p *Producer) WriteRecord(record *URL) error {
+func (p *Producer) WriteRecord(record *models.URL) error {
 	return p.encoder.Encode(&record)
 }
 
@@ -49,8 +50,8 @@ func NewConsumer(fileName string) (*Consumer, error) {
 	}, nil
 }
 
-func (c *Consumer) ReadRecord() (*URL, error) {
-	record := new(URL)
+func (c *Consumer) ReadRecord() (*models.URL, error) {
+	record := new(models.URL)
 	if err := c.decoder.Decode(&record); err != nil {
 		return nil, err
 	}
@@ -103,20 +104,24 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	return fileStore, nil
 }
 
-func (fs *fileStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
+func (fs *fileStore) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
 	return fs.cache.Get(ctx, sURL)
 }
 
-func (fs *fileStore) Save(ctx context.Context, url *URL) error {
+func (fs *fileStore) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
+	return fs.cache.GetAllByUserID(ctx, userID)
+}
+
+func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 	// check if the record already exists in the cache
 	record, err := fs.cache.Get(ctx, url.ShortURL)
-	if err != nil && !errors.Is(err, ErrURLNotFound) {
+	if err != nil && !errors.Is(err, models.ErrNotFound) {
 		return err
 	}
 
 	// if the record already exists return ErrConflict
 	if record != nil && record.OriginalURL == url.OriginalURL {
-		return ErrConflict
+		return models.ErrConflict
 	}
 
 	// write the record to the file if required
@@ -131,11 +136,11 @@ func (fs *fileStore) Save(ctx context.Context, url *URL) error {
 }
 
 // SaveAll saves multiple URL records to the file and cache.
-func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
+func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 	for _, url := range urls {
 		// check if the record already exists in the cache
 		record, err := fs.cache.Get(ctx, url.ShortURL)
-		if err != nil && !errors.Is(err, ErrURLNotFound) {
+		if err != nil && !errors.Is(err, models.ErrNotFound) {
 			return err
 		}
 
@@ -162,5 +167,5 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*URL) error {
 
 // fileStore Ping method tells that the real database is not connected.
 func (fs *fileStore) Ping(context.Context) error {
-	return ErrDBNotConnected
+	return models.ErrDBNotConnected
 }

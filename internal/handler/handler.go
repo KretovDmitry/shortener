@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
@@ -29,6 +30,9 @@ var (
 	ErrNotValidURL                    = errors.New("URL is not valid")
 )
 
+const TOKEN_EXP = time.Hour * 3
+const SECRET_KEY = "supersecretkey"
+
 // New constructs a new handlerContext,
 // ensuring that the dependencies are valid values
 func New(store db.URLStorage) (*handler, error) {
@@ -43,13 +47,14 @@ func New(store db.URLStorage) (*handler, error) {
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *handler) Register(r *chi.Mux) {
+func (h *handler) Register(r chi.Router) {
 	logger := logger.Get()
 
 	chain := middleware.BuildChain(
 		middleware.RequestLogger(logger),
 		gzip.DefaultHandler().WrapHandler,
 		gzip.Unzip(logger),
+		middleware.Authorization(h.logger, SECRET_KEY, TOKEN_EXP),
 	)
 
 	// Register routes.
@@ -59,14 +64,14 @@ func (h *handler) Register(r *chi.Mux) {
 
 	r.Get("/ping", chain(h.PingDB))
 	r.Get("/{shortURL}", chain(h.Redirect))
+	r.Get("/api/user/urls", chain(h.GetAllByUserID))
 }
 
 // textError writes error response to the response writer in a text/plain format.
 func (h *handler) textError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
 		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
-	}
-	if code >= 400 && code < 500 {
+	} else {
 		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

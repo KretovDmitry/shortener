@@ -1,27 +1,21 @@
-package db
+package models
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/google/uuid"
 )
 
-var (
-	ErrURLNotFound    = errors.New("URL not found")
-	ErrDBNotConnected = errors.New("database not connected")
-	ErrConflict       = errors.New("data conflict")
-)
-
 type (
 	ShortURL    string
 	OriginalURL string
 	URL         struct {
-		ID          string      `json:"id"`
+		ID          string      `json:"id,omitempty"`
 		ShortURL    ShortURL    `json:"short_url"`
 		OriginalURL OriginalURL `json:"original_url"`
+		UserID      string      `json:"user_id,omitempty"`
 	}
 )
 
@@ -30,10 +24,11 @@ func (s ShortURL) MarshalJSON() ([]byte, error) {
 	return json.Marshal(result)
 }
 
-func NewRecord(shortURL, originalURL string) *URL {
+func NewRecord(shortURL, originalURL, userID string) *URL {
 	return &URL{
 		ID:          uuid.NewString(),
 		ShortURL:    ShortURL(shortURL),
 		OriginalURL: OriginalURL(originalURL),
+		UserID:      userID,
 	}
 }

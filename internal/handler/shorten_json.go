@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -19,9 +19,9 @@ type (
 	}
 
 	shortenJSONResponsePayload struct {
-		Result  db.ShortURL `json:"result"`
-		Success bool        `json:"success"`
-		Message string      `json:"message"`
+		Result  models.ShortURL `json:"result"`
+		Success bool            `json:"success"`
+		Message string          `json:"message"`
 	}
 )
 
@@ -91,11 +91,17 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newRecord := db.NewRecord(generatedShortURL, payload.URL)
+	userID, ok := r.Context().Value(models.UserIDCtxKey{}).(string)
+	if !ok {
+		h.shortenJSONError(w, "could't assert user ID to string",
+			models.ErrInvalidDataType, http.StatusInternalServerError)
+	}
+
+	newRecord := models.NewRecord(generatedShortURL, payload.URL, userID)
 
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, db.ErrConflict) {
+	if err != nil && !errors.Is(err, models.ErrConflict) {
 		h.shortenJSONError(w, "failed to save to database: "+payload.URL, err, http.StatusInternalServerError)
 		return
 	}
@@ -103,14 +109,14 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// Set the response headers and status code
 	w.Header().Set("Content-Type", "application/json")
 	switch {
-	case errors.Is(err, db.ErrConflict):
+	case errors.Is(err, models.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)
 	}
 
 	// create response payload
-	result := shortenJSONResponsePayload{Result: db.ShortURL(generatedShortURL), Success: true, Message: "OK"}
+	result := shortenJSONResponsePayload{Result: models.ShortURL(generatedShortURL), Success: true, Message: "OK"}
 
 	// encode response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {

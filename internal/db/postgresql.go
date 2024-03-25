@@ -6,9 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -23,24 +22,7 @@ type postgresStore struct {
 // NewPostgresStore creates a new Postgres database connection pool
 // and initializes the database schema.
 func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
-	var (
-		DB  *sql.DB
-		err error
-	)
-
-	err = retry.Do(func() error {
-		DB, err = goose.OpenDBWithDriver("pgx", dsn)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	},
-		retry.Context(ctx),
-		retry.Attempts(3),
-		retry.Delay(1*time.Second),
-	)
-
+	DB, err := goose.OpenDBWithDriver("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("goose: failed to open DB: %v", err)
 	}
@@ -55,22 +37,22 @@ func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
 
 // Save saves a new URL record to the database.
 // If a URL record already exists, ErrConflict is returned.
-func (pg *postgresStore) Save(ctx context.Context, u *URL) error {
+func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
 	const q = `
 		INSERT INTO url
-			(id, short_url, original_url)
+			(id, short_url, original_url, user_id)
 		VALUES
-			($1, $2, $3)
+			($1, $2, $3, $4)
 	`
 
 	// query the database to insert the URL record
-	_, err := pg.store.ExecContext(ctx, q, u.ID, u.ShortURL, u.OriginalURL)
+	_, err := pg.store.ExecContext(ctx, q, u.ID, u.ShortURL, u.OriginalURL, u.UserID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			// return ErrConflict if the record already exists
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return ErrConflict
+				return models.ErrConflict
 			}
 			// create a new error with additional context
 			return fmt.Errorf("save url with query (%s): %w",
@@ -87,12 +69,12 @@ func (pg *postgresStore) Save(ctx context.Context, u *URL) error {
 // SaveAll saves multiple URL records to the database in a single transaction.
 // If a URL record already exists, the record is not inserted.
 // If the transaction fails, all changes are rolled back.
-func (pg *postgresStore) SaveAll(ctx context.Context, urls []*URL) error {
+func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 	const q = `
         INSERT INTO url 
-            (id, short_url, original_url)
+            (id, short_url, original_url, user_id)
         VALUES
-            ($1, $2, $3)
+            ($1, $2, $3, $4)
     `
 
 	tx, err := pg.store.BeginTx(ctx, nil)
@@ -107,7 +89,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*URL) error {
 	}
 
 	for _, url := range urls {
-		_, err := stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL)
+		_, err := stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL, url.UserID)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
@@ -130,7 +112,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*URL) error {
 
 // Get retrieves a URL record from the database based on its short URL.
 // If the URL record does not exist, ErrURLNotFound is returned.
-func (pg *postgresStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
+func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
 	const q = `
 		SELECT
 			id, short_url, original_url
@@ -140,11 +122,11 @@ func (pg *postgresStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
 			short_url = $1
 	`
 
-	u := new(URL)
+	u := new(models.URL)
 	err := pg.store.QueryRowContext(ctx, q, sURL).Scan(&u.ID, &u.ShortURL, &u.OriginalURL)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, ErrURLNotFound
+			return nil, models.ErrNotFound
 		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -158,6 +140,54 @@ func (pg *postgresStore) Get(ctx context.Context, sURL ShortURL) (*URL, error) {
 	}
 
 	return u, nil
+}
+
+func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
+	const q = `
+		SELECT
+			short_url, original_url
+		FROM
+			url
+		WHERE
+			user_id = $1
+	`
+	rows, err := pg.store.QueryContext(ctx, q, userID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			// Create a new error with additional context.
+			return nil, fmt.Errorf("retrieve url with query (%s): %w",
+				formatQuery(q), formatPgError(pgErr),
+			)
+		}
+
+		return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
+	}
+
+	all := make([]*models.URL, 0)
+	for rows.Next() {
+		u := new(models.URL)
+		err := rows.Scan(&u.ShortURL, &u.OriginalURL)
+		if err != nil {
+			return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
+		}
+		all = append(all, u)
+	}
+
+	if err = rows.Close(); err != nil {
+		return nil, fmt.Errorf("close rows with query (%s): %w", formatQuery(q), err)
+	}
+
+	// Rows.Err will report the last error encountered by Rows.Scan.
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
+	}
+
+	if len(all) == 0 {
+		return nil, models.ErrNotFound
+	}
+
+	return all, nil
 }
 
 // Ping verifies the connection to the database is alive.

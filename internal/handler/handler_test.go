@@ -10,6 +10,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,24 +30,27 @@ type mockStore struct {
 }
 
 // do nothing on create, return ErrConflict if URL already exists
-func (s *mockStore) Save(ctx context.Context, url *db.URL) error {
+func (s *mockStore) Save(ctx context.Context, url *models.URL) error {
 	if s.expectedData == string(url.OriginalURL) {
-		return db.ErrConflict
+		return models.ErrConflict
 	}
 	return nil
 }
 
-func (s *mockStore) SaveAll(context.Context, []*db.URL) error {
+func (s *mockStore) SaveAll(context.Context, []*models.URL) error {
 	return nil
 }
 
 // return expected data
-func (s *mockStore) Get(context.Context, db.ShortURL) (*db.URL, error) {
+func (s *mockStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
 	// mock not found error
 	if s.expectedData == "" {
-		return nil, db.ErrURLNotFound
+		return nil, models.ErrNotFound
 	}
-	return &db.URL{OriginalURL: db.OriginalURL(s.expectedData)}, nil
+	return &models.URL{OriginalURL: models.OriginalURL(s.expectedData)}, nil
+}
+func (s *mockStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
+	return nil, nil
 }
 func (s *mockStore) Ping(context.Context) error {
 	return nil
@@ -55,15 +59,18 @@ func (s *mockStore) Ping(context.Context) error {
 // simulating errors with storage operations
 type brokenStore struct{}
 
-func (s *brokenStore) Save(context.Context, *db.URL) error {
+func (s *brokenStore) Save(context.Context, *models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
-func (s *brokenStore) SaveAll(context.Context, []*db.URL) error {
+func (s *brokenStore) SaveAll(context.Context, []*models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
 
-func (s *brokenStore) Get(context.Context, db.ShortURL) (*db.URL, error) {
+func (s *brokenStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
 	return nil, errIntentionallyNotWorkingMethod
+}
+func (s *brokenStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
+	return nil, nil
 }
 
 func (s *brokenStore) Ping(context.Context) error {
@@ -75,7 +82,7 @@ type notConnectedStore struct {
 }
 
 func (s *notConnectedStore) Ping(context.Context) error {
-	return db.ErrDBNotConnected
+	return models.ErrDBNotConnected
 }
 
 func TestNew(t *testing.T) {

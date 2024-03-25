@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -18,28 +18,36 @@ type (
 	}
 
 	shortenBatchResponsePayload struct {
-		CorrelationID string      `json:"correlation_id"`
-		ShortURL      db.ShortURL `json:"short_url"`
+		CorrelationID string          `json:"correlation_id"`
+		ShortURL      models.ShortURL `json:"short_url"`
 	}
 )
 
 // ShortenBatch handles requests to shorten multiple URLs in a single request.
 //
-// Request body:
+// Request
+//
+//	POST /api/shorten/batch
+//	Content-Type: application/json
+//
 // [
 //
 //	{
 //		"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//		"original_url": "http://nywha1.yandex/ovuaqasue6jd4"
+//		"original_url": "http://..."
 //	},
 //	{
 //		"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//		"original_url": "http://wakkz7fjeuj.yandex/uwijfp9cbpn/a3hfjaww/x0mhpeq"
+//		"original_url": "http://..."
 //	}
 //
 // ]
 //
-// Response body:
+// Response:
+//
+//	HTTP/1.1 201 Created
+//	Content-Type: application/json
+//
 // [
 //
 //	{
@@ -80,8 +88,12 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debug("received batch request", zap.Int("count", len(payload)))
 
 	// prepare the records to save and send
-	recordsToSave := make([]*db.URL, len(payload))
+	recordsToSave := make([]*models.URL, len(payload))
 	result := make([]shortenBatchResponsePayload, len(payload))
+	userID, ok := r.Context().Value(models.UserIDCtxKey{}).(string)
+	if !ok {
+		h.textError(w, "could't assert user ID to string", models.ErrInvalidDataType, http.StatusInternalServerError)
+	}
 
 	for i, p := range payload {
 
@@ -104,8 +116,8 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		recordsToSave[i] = db.NewRecord(shortURL, p.OriginalURL)
-		result[i] = shortenBatchResponsePayload{p.CorrelationID, db.ShortURL(shortURL)}
+		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, userID)
+		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}
 
 	h.logger.Debug("saving batch of records", zap.Int("count", len(recordsToSave)))

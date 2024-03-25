@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -60,11 +60,16 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newRecord := db.NewRecord(generatedShortURL, originalURL)
+	userID, ok := r.Context().Value(models.UserIDCtxKey{}).(string)
+	if !ok {
+		h.textError(w, "could't assert user ID to string", models.ErrInvalidDataType, http.StatusInternalServerError)
+	}
+
+	newRecord := models.NewRecord(generatedShortURL, originalURL, userID)
 
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, db.ErrConflict) {
+	if err != nil && !errors.Is(err, models.ErrConflict) {
 		h.textError(w, "failed to save to database: "+originalURL, err, http.StatusInternalServerError)
 		return
 	}
@@ -72,7 +77,7 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	// Set the response headers and status code
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	switch {
-	case errors.Is(err, db.ErrConflict):
+	case errors.Is(err, models.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)

@@ -54,17 +54,26 @@ func (h *handler) Register(r chi.Router) {
 		middleware.RequestLogger(logger),
 		gzip.DefaultHandler().WrapHandler,
 		gzip.Unzip(logger),
-		middleware.Authorization(h.logger, SECRET_KEY, TOKEN_EXP),
+	)
+
+	registerChain := middleware.BuildChain(
+		chain,
+		middleware.DumbRegistration(h.logger, SECRET_KEY, TOKEN_EXP),
+	)
+
+	authChain := middleware.BuildChain(
+		chain,
+		middleware.DumbAuthorization(h.logger, SECRET_KEY, TOKEN_EXP),
 	)
 
 	// Register routes.
-	r.Post("/", chain(h.ShortenText))
-	r.Post("/api/shorten", chain(h.ShortenJSON))
-	r.Post("/api/shorten/batch", chain(h.ShortenBatch))
+	r.Post("/", registerChain(h.ShortenText))
+	r.Post("/api/shorten", registerChain(h.ShortenJSON))
+	r.Post("/api/shorten/batch", registerChain(h.ShortenBatch))
 
 	r.Get("/ping", chain(h.PingDB))
 	r.Get("/{shortURL}", chain(h.Redirect))
-	r.Get("/api/user/urls", chain(h.GetAllByUserID))
+	r.Get("/api/user/urls", authChain(h.GetAllByUserID))
 }
 
 // textError writes error response to the response writer in a text/plain format.

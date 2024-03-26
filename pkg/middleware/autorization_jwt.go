@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -31,12 +32,14 @@ func BuildJWTString(userID, secret string, tokenExp time.Duration) (string, erro
 		return "", err
 	}
 
-	return tokenString, nil
+	return fmt.Sprintf("Bearer %s", tokenString), nil
 }
 
 // GetUserID extracts the user ID from a JWT token.
 func GetUserID(tokenString, secret string) (string, error) {
 	claims := &Claims{}
+
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		// Verify that the token method is HS256
@@ -62,9 +65,11 @@ func GetUserID(tokenString, secret string) (string, error) {
 	return claims.UserID, nil
 }
 
-// Authorization checks if the user has a valid JWT token,
+// DumbRegistration checks if the user has a valid JWT token,
 // if not sets a new one with a new user ID.
-func Authorization(logger *zap.Logger, secret string, tokenExp time.Duration) func(http.HandlerFunc) http.HandlerFunc {
+func DumbRegistration(
+	logger *zap.Logger, secret string, tokenExp time.Duration,
+) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// If neither authorization cookie found, nor valid token is provided
@@ -73,14 +78,6 @@ func Authorization(logger *zap.Logger, secret string, tokenExp time.Duration) fu
 			authCookie, err := r.Cookie("Authorization")
 			if err == nil {
 				if id, err := GetUserID(authCookie.Value, secret); err == nil {
-					// User ID must be in JWT token.
-					// If no user ID is provided, Authorization middleware will respond with
-					// status code 401 Unauthorized.
-					if id == "" {
-						http.Error(w, "JWT token does't contain user ID", http.StatusUnauthorized)
-						logger.Info("JWT token does not contain user ID")
-						return
-					}
 					logger.Info("JWT token contains user ID", zap.String("id", id))
 					ctx := context.WithValue(r.Context(), models.UserIDCtxKey{}, id)
 					next(w, r.WithContext(ctx))
@@ -114,6 +111,34 @@ func Authorization(logger *zap.Logger, secret string, tokenExp time.Duration) fu
 
 			logger.Info("New user", zap.String("id", id))
 
+			ctx := context.WithValue(r.Context(), models.UserIDCtxKey{}, id)
+
+			next(w, r.WithContext(ctx))
+		}
+	}
+}
+
+func DumbAuthorization(logger *zap.Logger, secret string, tokenExp time.Duration) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			authCookie, err := r.Cookie("Authorization")
+			if err != nil {
+				if err == http.ErrNoCookie {
+					http.Error(w, "Authorization cookie not found", http.StatusUnauthorized)
+					logger.Info("Authorization cookie not found")
+					return
+				}
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			id, err := GetUserID(authCookie.Value, secret)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			logger.Info("JWT token contains user ID", zap.String("id", id))
 			ctx := context.WithValue(r.Context(), models.UserIDCtxKey{}, id)
 
 			next(w, r.WithContext(ctx))

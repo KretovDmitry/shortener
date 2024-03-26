@@ -26,6 +26,9 @@ func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("goose: failed to open DB: %v", err)
 	}
+	if err = goose.DownTo(DB, ".", 0); err != nil {
+		return nil, fmt.Errorf("goose: failed to migrate DB: %v", err)
+	}
 
 	err = goose.Up(DB, ".")
 	if err != nil {

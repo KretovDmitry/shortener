@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -90,9 +91,10 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	// prepare the records to save and send
 	recordsToSave := make([]*models.URL, len(payload))
 	result := make([]shortenBatchResponsePayload, len(payload))
-	userID, ok := r.Context().Value(models.UserIDCtxKey{}).(string)
+	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "could't assert user ID to string", models.ErrInvalidDataType, http.StatusInternalServerError)
+		h.shortenJSONError(w, "could't assert user ID to string",
+			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 
 	for i, p := range payload {
@@ -116,7 +118,7 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, userID)
+		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, user.ID)
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}
 

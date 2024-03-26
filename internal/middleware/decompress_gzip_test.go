@@ -1,4 +1,4 @@
-package gzip
+package middleware
 
 import (
 	"bytes"
@@ -10,17 +10,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func TestUnzip(t *testing.T) {
-	var handler http.HandlerFunc = (func(w http.ResponseWriter, r *http.Request) {
+	var handler http.Handler = http.HandlerFunc((func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		r.Body.Close()
 		w.Write(body)
-	})
+	}))
 
 	mockData := []byte("https://test.com")
 
@@ -44,9 +43,9 @@ func TestUnzip(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			r.Header.Set("Content-Encoding", tt.contentEncoding)
-			handler = Unzip(zap.L())(handler)
+			handler = Unzip(handler)
 
-			handler(w, r)
+			handler.ServeHTTP(w, r)
 
 			result := w.Result()
 			defer result.Body.Close()

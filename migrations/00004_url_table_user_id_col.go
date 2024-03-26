@@ -18,7 +18,7 @@ func init() {
 func upAddUserIDColumnToURLTable(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE IF EXISTS public.url
-		ADD COLUMN IF NOT EXISTS user_id UUID;
+		ADD COLUMN IF NOT EXISTS user_id UUID DEFAULT gen_random_uuid();
 	`)
 	if err != nil {
 		return fmt.Errorf("add user_id column to URL table: %w", err)

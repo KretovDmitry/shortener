@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
-	"github.com/KretovDmitry/shortener/pkg/middleware"
-	"github.com/KretovDmitry/shortener/pkg/middleware/gzip"
+	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
 )
 
@@ -30,9 +29,6 @@ var (
 	ErrNotValidURL                    = errors.New("URL is not valid")
 )
 
-const TOKEN_EXP = time.Hour * 3
-const SECRET_KEY = "supersecretkey"
-
 // New constructs a new handlerContext,
 // ensuring that the dependencies are valid values
 func New(store db.URLStorage) (*handler, error) {
@@ -48,32 +44,22 @@ func New(store db.URLStorage) (*handler, error) {
 
 // Register sets up the routes for the HTTP server.
 func (h *handler) Register(r chi.Router) {
-	logger := logger.Get()
+	r.Use(middleware.Logger)
+	r.Use(gzip.DefaultHandler().WrapHandler)
+	r.Use(middleware.Unzip)
+	r.Use(middleware.Authorization)
 
-	chain := middleware.BuildChain(
-		middleware.RequestLogger(logger),
-		gzip.DefaultHandler().WrapHandler,
-		gzip.Unzip(logger),
-	)
+	r.Post("/", h.ShortenText)
+	r.Post("/api/shorten", h.ShortenJSON)
+	r.Post("/api/shorten/batch", h.ShortenBatch)
 
-	registerChain := middleware.BuildChain(
-		chain,
-		middleware.DumbRegistration(h.logger, SECRET_KEY, TOKEN_EXP),
-	)
+	r.Get("/ping", h.PingDB)
+	r.Get("/{shortURL}", h.Redirect)
 
-	authChain := middleware.BuildChain(
-		chain,
-		middleware.DumbAuthorization(h.logger, SECRET_KEY, TOKEN_EXP),
-	)
-
-	// Register routes.
-	r.Post("/", registerChain(h.ShortenText))
-	r.Post("/api/shorten", registerChain(h.ShortenJSON))
-	r.Post("/api/shorten/batch", registerChain(h.ShortenBatch))
-
-	r.Get("/ping", chain(h.PingDB))
-	r.Get("/{shortURL}", chain(h.Redirect))
-	r.Get("/api/user/urls", authChain(h.GetAllByUserID))
+	r.Route("/api/user", func(r chi.Router) {
+		r.Use(middleware.OnlyWithToken)
+		r.Get("/urls", h.GetAllByUserID)
+	})
 }
 
 // textError writes error response to the response writer in a text/plain format.

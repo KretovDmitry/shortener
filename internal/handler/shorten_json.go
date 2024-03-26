@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -91,13 +95,20 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := r.Context().Value(models.UserIDCtxKey{}).(string)
+	user, ok := user.FromContext(r.Context())
 	if !ok {
 		h.shortenJSONError(w, "could't assert user ID to string",
 			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 
-	newRecord := models.NewRecord(generatedShortURL, payload.URL, userID)
+	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
+
+	// Build the JWT authentication token.
+	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, config.JWT.Expiration)
+	if err != nil {
+		h.shortenJSONError(w, "failed to build JWT token", err, http.StatusInternalServerError)
+		return
+	}
 
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
@@ -114,6 +125,14 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusCreated)
 	}
+
+	// Set the "Authorization" cookie with the JWT authentication token.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "Authorization",
+		Value:    authToken,
+		Expires:  time.Now().Add(config.JWT.Expiration),
+		HttpOnly: true,
+	})
 
 	// create response payload
 	result := shortenJSONResponsePayload{Result: models.ShortURL(generatedShortURL), Success: true, Message: "OK"}

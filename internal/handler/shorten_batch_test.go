@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,14 +9,13 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestShortenBatch(t *testing.T) {
 	path := "/api/shorten/batch"
-	validUserID := "user"
 
 	const goodPayload = `
 	[
@@ -53,7 +51,6 @@ func TestShortenBatch(t *testing.T) {
 		contentType string
 		payload     string
 		store       db.URLStorage
-		userId      any
 		want        want
 		wantErr     bool
 	}{
@@ -63,7 +60,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,
@@ -75,7 +71,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       &mockStore{expectedData: "https://go.dev/"},
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,
@@ -87,7 +82,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("bad method: %s: %s", http.MethodGet, ErrOnlyPOSTMethodIsAllowed),
@@ -99,7 +93,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyPOSTMethodIsAllowed),
@@ -111,7 +104,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyPOSTMethodIsAllowed),
@@ -123,7 +115,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyPOSTMethodIsAllowed),
@@ -135,7 +126,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: textPlain,
 			payload:     goodPayload,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("bad content-type: %s: %s", textPlain, ErrOnlyApplicationJSONContentType),
@@ -147,7 +137,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     invalidJSON,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   "failed to decode request",
@@ -160,7 +149,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     "",
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   "failed to decode request",
@@ -173,7 +161,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     emptyURL,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("url field is empty: %s", ErrURLIsNotProvided),
@@ -185,7 +172,6 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     invalidURL,
 			store:       emptyMockStore,
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("shorten url: https://test...com: %s", ErrNotValidURL),
@@ -197,31 +183,17 @@ func TestShortenBatch(t *testing.T) {
 			contentType: applicationJSON,
 			payload:     goodPayload,
 			store:       &brokenStore{},
-			userId:      validUserID,
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   fmt.Sprintf("failed to save to database: %s", errIntentionallyNotWorkingMethod),
 			},
-		},
-		{
-			name:        "invalid user id type",
-			method:      http.MethodPost,
-			contentType: applicationJSON,
-			payload:     goodPayload,
-			store:       emptyMockStore,
-			userId:      nil,
-			want: want{
-				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("could't assert user ID to string: %s", models.ErrInvalidDataType),
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(tt.method, path, strings.NewReader(tt.payload))
 			r.Header.Set(contentType, tt.contentType)
-			r = r.WithContext(context.WithValue(r.Context(), models.UserIDCtxKey{}, tt.userId))
+			r = r.WithContext(user.NewContext(r.Context(), &user.User{ID: "test"}))
 
 			w := httptest.NewRecorder()
 

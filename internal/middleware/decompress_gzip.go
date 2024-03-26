@@ -1,4 +1,4 @@
-package gzip
+package middleware
 
 import (
 	"compress/gzip"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -41,23 +42,25 @@ func (c *compressReader) Close() error {
 }
 
 // Unzip decides whether or not to decompress request judging by content encoding.
-func Unzip(logger *zap.Logger) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			contentEncoding := r.Header.Get("Content-Encoding")
-			sendsGzip := strings.Contains(contentEncoding, "gzip")
-			if sendsGzip {
-				cr, err := newCompressReader(r.Body)
-				if err != nil {
-					logger.Error("new compress reader", zap.Error(err))
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				r.Body = cr
-				defer cr.Close()
-			}
+func Unzip(next http.Handler) http.Handler {
+	l := logger.Get()
+	defer l.Sync()
 
-			next(w, r)
+	f := func(w http.ResponseWriter, r *http.Request) {
+		contentEncoding := r.Header.Get("Content-Encoding")
+		sendsGzip := strings.Contains(contentEncoding, "gzip")
+		if sendsGzip {
+			cr, err := newCompressReader(r.Body)
+			if err != nil {
+				l.Error("new compress reader", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			r.Body = cr
+			defer cr.Close()
 		}
+
+		next.ServeHTTP(w, r)
 	}
+	return http.HandlerFunc(f)
 }

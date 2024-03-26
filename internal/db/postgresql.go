@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -26,11 +27,8 @@ func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("goose: failed to open DB: %v", err)
 	}
-	if err = goose.DownTo(DB, ".", 0); err != nil {
-		return nil, fmt.Errorf("goose: failed to migrate DB: %v", err)
-	}
 
-	err = goose.Up(DB, ".")
+	err = goose.Up(DB, config.MigrationDir)
 	if err != nil {
 		return nil, fmt.Errorf("goose: failed to migrate DB: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"go.uber.org/zap"
 )
 
@@ -40,17 +41,18 @@ func (h *handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := r.Context().Value(models.UserIDCtxKey{}).(string)
+	// Extract the user ID from the request context.
+	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "could't assert user ID to string", models.ErrInvalidDataType, http.StatusInternalServerError)
-		return
+		h.textError(w, "could't assert user ID to string",
+			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 
-	URLs, err := h.store.GetAllByUserID(r.Context(), userID)
+	URLs, err := h.store.GetAllByUserID(r.Context(), user.ID)
 	if err != nil {
 		if errors.Is(err, models.ErrNotFound) {
 			w.WriteHeader(http.StatusNoContent)
-			h.logger.Info("No URLs found for user", zap.String("userID", userID))
+			h.logger.Info("No URLs found for user", zap.String("userID", user.ID))
 			return
 		}
 		h.textError(w, "failed to get URLs", err, http.StatusInternalServerError)

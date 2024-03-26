@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -91,12 +92,40 @@ func (fs *fileStorage) WriteRequired() bool {
 	return fs.writeRequired
 }
 
+type JWTExpiration struct {
+	Expiration time.Duration
+}
+
+func NewJWTExpiration() *JWTExpiration {
+	return &JWTExpiration{
+		Expiration: time.Hour * 3,
+	}
+}
+
+func (e *JWTExpiration) String() string {
+	return e.Expiration.String()
+}
+
+func (e *JWTExpiration) Set(s string) error {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+
+	e.Expiration = d
+
+	return nil
+}
+
 var (
 	AddrToRun    = NewNetAddress()
 	AddrToReturn = NewNetAddress()
 	FileStorage  = NewFileStorage()
 	DSN          string
 	LogLevel     string
+	Secret       string
+	JWT          = NewJWTExpiration()
+	MigrationDir string
 )
 
 func ParseFlags() error {
@@ -104,8 +133,11 @@ func ParseFlags() error {
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
 	flag.Var(FileStorage, "f", "File storage path")
+	flag.Var(JWT, "j", `JWT lifetime in form of time.Duration: such as "2h45m".`)
 	flag.StringVar(&DSN, "d", "", "Data source name in form postgres URL or DSN string")
 	flag.StringVar(&LogLevel, "l", "info", "Log level")
+	flag.StringVar(&Secret, "s", "test", "Secret key for JWT")
+	flag.StringVar(&MigrationDir, "m", ".", "Path to migration directory")
 	flag.Parse()
 
 	// ENV variables have the highest priority

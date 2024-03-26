@@ -9,9 +9,9 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
-	"github.com/KretovDmitry/shortener/pkg/middleware"
-	"github.com/KretovDmitry/shortener/pkg/middleware/gzip"
+	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
 )
 
@@ -43,30 +43,30 @@ func New(store db.URLStorage) (*handler, error) {
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *handler) Register(r *chi.Mux) {
-	logger := logger.Get()
+func (h *handler) Register(r chi.Router) {
+	r.Use(middleware.Logger)
+	r.Use(gzip.DefaultHandler().WrapHandler)
+	r.Use(middleware.Unzip)
+	r.Use(middleware.Authorization)
 
-	chain := middleware.BuildChain(
-		middleware.RequestLogger(logger),
-		gzip.DefaultHandler().WrapHandler,
-		gzip.Unzip(logger),
-	)
+	r.Post("/", h.ShortenText)
+	r.Post("/api/shorten", h.ShortenJSON)
+	r.Post("/api/shorten/batch", h.ShortenBatch)
 
-	// Register routes.
-	r.Post("/", chain(h.ShortenText))
-	r.Post("/api/shorten", chain(h.ShortenJSON))
-	r.Post("/api/shorten/batch", chain(h.ShortenBatch))
+	r.Get("/ping", h.PingDB)
+	r.Get("/{shortURL}", h.Redirect)
 
-	r.Get("/ping", chain(h.PingDB))
-	r.Get("/{shortURL}", chain(h.Redirect))
+	r.Route("/api/user", func(r chi.Router) {
+		r.Use(middleware.OnlyWithToken)
+		r.Get("/urls", h.GetAllByUserID)
+	})
 }
 
 // textError writes error response to the response writer in a text/plain format.
 func (h *handler) textError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
 		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
-	}
-	if code >= 400 && code < 500 {
+	} else {
 		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

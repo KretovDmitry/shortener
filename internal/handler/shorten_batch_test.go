@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -192,6 +193,7 @@ func TestShortenBatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(tt.method, path, strings.NewReader(tt.payload))
 			r.Header.Set(contentType, tt.contentType)
+			r = r.WithContext(user.NewContext(r.Context(), &user.User{ID: "test"}))
 
 			w := httptest.NewRecorder()
 
@@ -208,7 +210,10 @@ func TestShortenBatch(t *testing.T) {
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
 			case tt.wantErr:
-				assert.True(t, strings.Contains(response, tt.want.response))
+				if !assert.True(t, strings.Contains(response, tt.want.response)) {
+					fmt.Println(response)
+					fmt.Println(tt.want.response)
+				}
 			case !tt.wantErr:
 				assert.Equal(t, tt.want.response, response)
 			}

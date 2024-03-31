@@ -168,7 +168,7 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 	all := make([]*models.URL, 0)
 	for rows.Next() {
 		u := new(models.URL)
-		err := rows.Scan(&u.ShortURL, &u.OriginalURL)
+		err = rows.Scan(&u.ShortURL, &u.OriginalURL)
 		if err != nil {
 			return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
 		}
@@ -189,6 +189,11 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 	}
 
 	return all, nil
+}
+
+func (pg *postgresStore) DeleteURLs(ctx context.Context) error {
+
+	return nil
 }
 
 // Ping verifies the connection to the database is alive.

@@ -1,23 +1,27 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
 )
 
 type handler struct {
-	store  db.URLStorage
-	logger *zap.Logger
+	store          db.URLStorage
+	logger         *zap.Logger
+	deleteURLsChan chan *models.ShortURL
 }
 
 var (
@@ -36,10 +40,15 @@ func New(store db.URLStorage) (*handler, error) {
 		return nil, errors.New("nil store")
 	}
 
-	return &handler{
-		store:  store,
-		logger: logger.Get(),
-	}, nil
+	newInstance := &handler{
+		store:          store,
+		logger:         logger.Get(),
+		deleteURLsChan: make(chan *models.ShortURL),
+	}
+
+	go newInstance.flushDeleteURL()
+
+	return newInstance, nil
 }
 
 // Register sets up the routes for the HTTP server.
@@ -60,6 +69,33 @@ func (h *handler) Register(r chi.Router) {
 		r.Use(middleware.OnlyWithToken)
 		r.Get("/urls", h.GetAllByUserID)
 	})
+}
+
+func (h *handler) flushDeleteURL() {
+	ticker := time.NewTicker(10 * time.Second)
+
+	var URLs []*models.ShortURL
+
+	for {
+		select {
+		case url := <-h.deleteURLsChan:
+			URLs = append(URLs, url)
+
+		case <-ticker.C:
+			if len(URLs) == 0 {
+				continue
+			}
+
+			err := h.store.DeleteURLs(context.TODO(), URLs...)
+			if err != nil {
+				h.logger.Error("cannot save messages", zap.Error(err))
+				continue
+			}
+
+			URLs = nil
+		}
+	}
+
 }
 
 // textError writes error response to the response writer in a text/plain format.

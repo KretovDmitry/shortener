@@ -47,9 +47,10 @@ func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error
 	s.mu.RLock()
 
 	for _, url := range urls {
-		for _, record := range s.store {
+		for shortURL, record := range s.store {
 			if record.UserID == url.UserID {
 				record.IsDeleted = true
+				s.store[shortURL] = record
 				break
 			}
 		}

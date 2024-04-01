@@ -30,7 +30,6 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/ugorji/go/codec v1.2.6 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -44,11 +43,11 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/klauspost/compress v1.17.7
+	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/nanmu42/gzip v1.2.0
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pressly/goose/v3 v3.19.2
-	github.com/signalsciences/ac v1.2.0
+	github.com/signalsciences/ac v1.2.0 // indirect
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

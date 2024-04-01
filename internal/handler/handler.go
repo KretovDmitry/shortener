@@ -21,12 +21,13 @@ import (
 type handler struct {
 	store          db.URLStorage
 	logger         *zap.Logger
-	deleteURLsChan chan *models.ShortURL
+	deleteURLsChan chan *models.URL
 }
 
 var (
 	ErrOnlyGETMethodIsAllowed         = errors.New("only GET method is allowed")
 	ErrOnlyPOSTMethodIsAllowed        = errors.New("only POST method is allowed")
+	ErrOnlyDeleteMethodIsAllowed      = errors.New("only DELETE method is allowed")
 	ErrOnlyApplicationJSONContentType = errors.New("only application/json content-type is allowed")
 	ErrOnlyTextPlainContentType       = errors.New("only text/plain content-type is allowed")
 	ErrURLIsNotProvided               = errors.New("URL is not provided")
@@ -43,7 +44,7 @@ func New(store db.URLStorage) (*handler, error) {
 	newInstance := &handler{
 		store:          store,
 		logger:         logger.Get(),
-		deleteURLsChan: make(chan *models.ShortURL),
+		deleteURLsChan: make(chan *models.URL),
 	}
 
 	go newInstance.flushDeleteURL()
@@ -65,6 +66,8 @@ func (h *handler) Register(r chi.Router) {
 	r.Get("/ping", h.PingDB)
 	r.Get("/{shortURL}", h.Redirect)
 
+	r.Delete("/api/user/urls", h.DeleteByUserID)
+
 	r.Route("/api/user", func(r chi.Router) {
 		r.Use(middleware.OnlyWithToken)
 		r.Get("/urls", h.GetAllByUserID)
@@ -74,7 +77,7 @@ func (h *handler) Register(r chi.Router) {
 func (h *handler) flushDeleteURL() {
 	ticker := time.NewTicker(10 * time.Second)
 
-	var URLs []*models.ShortURL
+	var URLs []*models.URL
 
 	for {
 		select {
@@ -88,7 +91,7 @@ func (h *handler) flushDeleteURL() {
 
 			err := h.store.DeleteURLs(context.TODO(), URLs...)
 			if err != nil {
-				h.logger.Error("cannot save messages", zap.Error(err))
+				h.logger.Error("failed delete URLs", zap.Error(err))
 				continue
 			}
 

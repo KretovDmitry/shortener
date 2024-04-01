@@ -65,7 +65,7 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "could't assert user ID to string",
+		h.textError(w, "failed get user from context",
 			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 

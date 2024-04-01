@@ -13,7 +13,7 @@ type URLStorage interface {
 	SaveAll(context.Context, []*models.URL) error
 	Get(context.Context, models.ShortURL) (*models.URL, error)
 	GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error)
-	DeleteURLs(ctx context.Context) error
+	DeleteURLs(ctx context.Context, urls ...*models.URL) error
 	Ping(context.Context) error
 }
 

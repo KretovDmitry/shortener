@@ -42,6 +42,11 @@ func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if record.IsDeleted {
+		w.WriteHeader(http.StatusGone)
+		return
+	}
+
 	// set redirect header
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Location", string(record.OriginalURL))

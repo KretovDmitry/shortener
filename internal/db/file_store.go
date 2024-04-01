@@ -112,6 +112,10 @@ func (fs *fileStore) GetAllByUserID(ctx context.Context, userID string) ([]*mode
 	return fs.cache.GetAllByUserID(ctx, userID)
 }
 
+func (fs *fileStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
+	return fs.cache.DeleteURLs(ctx, urls...)
+}
+
 func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 	// check if the record already exists in the cache
 	record, err := fs.cache.Get(ctx, url.ShortURL)

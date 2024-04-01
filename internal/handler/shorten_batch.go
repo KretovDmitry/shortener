@@ -93,7 +93,7 @@ func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	result := make([]shortenBatchResponsePayload, len(payload))
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.shortenJSONError(w, "could't assert user ID to string",
+		h.shortenJSONError(w, "failed get user from context",
 			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 

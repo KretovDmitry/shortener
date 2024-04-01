@@ -97,7 +97,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.shortenJSONError(w, "could't assert user ID to string",
+		h.shortenJSONError(w, "failed get user from context",
 			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 

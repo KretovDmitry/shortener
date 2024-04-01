@@ -16,7 +16,7 @@ type (
 		ShortURL    ShortURL    `json:"short_url"`
 		OriginalURL OriginalURL `json:"original_url"`
 		UserID      string      `json:"user_id,omitempty"`
-		DeletedFlag bool        `db:"is_deleted"`
+		IsDeleted   bool        `db:"is_deleted"`
 	}
 )
 

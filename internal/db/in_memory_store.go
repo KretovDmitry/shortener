@@ -43,6 +43,21 @@ func (s *inMemoryStore) GetAllByUserID(_ context.Context, userID string) ([]*mod
 	return all, nil
 }
 
+func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
+	s.mu.RLock()
+
+	for _, url := range urls {
+		for _, record := range s.store {
+			if record.UserID == url.UserID {
+				record.IsDeleted = true
+			}
+		}
+	}
+
+	s.mu.RUnlock()
+	return nil
+}
+
 func (s *inMemoryStore) Save(u *models.URL) error {
 	s.mu.Lock()
 	s.store[u.ShortURL] = *u

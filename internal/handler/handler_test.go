@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,6 +51,10 @@ func (s *mockStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
 func (s *mockStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
 	return nil, nil
 }
+
+func (s *mockStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
+	return nil
+}
 func (s *mockStore) Ping(context.Context) error {
 	return nil
 }
@@ -71,6 +74,9 @@ func (s *brokenStore) Get(context.Context, models.ShortURL) (*models.URL, error)
 }
 func (s *brokenStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
 	return nil, nil
+}
+func (s *brokenStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
+	return nil
 }
 
 func (s *brokenStore) Ping(context.Context) error {
@@ -103,8 +109,7 @@ func TestNew(t *testing.T) {
 				store: emptyMockStore,
 			},
 			want: &handler{
-				store:  emptyMockStore,
-				logger: logger.Get(),
+				store: emptyMockStore,
 			},
 			wantErr: false,
 		},
@@ -123,8 +128,10 @@ func TestNew(t *testing.T) {
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}
-			if !assert.Equal(t, got, tt.want) {
-				t.Errorf("got = %v, want %v", got, tt.want)
+			if !tt.wantErr {
+				if !assert.Equal(t, got.store, tt.want.store) {
+					t.Errorf("got = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}

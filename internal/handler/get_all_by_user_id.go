@@ -44,7 +44,7 @@ func (h *handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "could't assert user ID to string",
+		h.textError(w, "failed get user from context",
 			models.ErrInvalidDataType, http.StatusInternalServerError)
 	}
 
@@ -58,7 +58,8 @@ func (h *handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 		h.textError(w, "failed to get URLs", err, http.StatusInternalServerError)
 		return
 	}
-	h.logger.Info("URLs", zap.Any("URLs", URLs))
+
+	h.logger.Debug("URLs", zap.Any("URLs", URLs))
 
 	// set the response header content type
 	w.Header().Set("Content-Type", "application/json")

@@ -49,7 +49,7 @@ func OnlyWithToken(next http.Handler) http.Handler {
 // Authorization is a middleware function that checks for an "Authorization" cookie
 // and extracts the user ID from the JWT token. If the user ID is found, it adds
 // it to the request context as a value associated with the UserIDCtxKey.
-// It will create new authorization cookie if provided.
+// It will create new user id if cookie is not provided.
 func Authorization(next http.Handler) http.Handler {
 	l := logger.Get()
 	defer l.Sync()

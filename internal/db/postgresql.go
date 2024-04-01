@@ -191,9 +191,45 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 	return all, nil
 }
 
-func (pg *postgresStore) DeleteURLs(ctx context.Context) error {
+func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
+	const q = `
+		UPDATE url
+		SET is_deleted = TRUE
+		WHERE user_id = $1
+		AND short_url = $2
+	`
 
-	return nil
+	tx, err := pg.store.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, q)
+	if err != nil {
+		return fmt.Errorf("prepare statement: %w", err)
+	}
+
+	for _, url := range urls {
+		_, err := stmt.ExecContext(ctx, url.UserID, url.ShortURL)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) {
+				// continue if the record already exists
+				if pgErr.Code == pgerrcode.UniqueViolation {
+					continue
+				}
+				// create a new error with additional context
+				return fmt.Errorf("delete url with query (%s): %w",
+					formatQuery(q), formatPgError(pgErr),
+				)
+			}
+
+			return fmt.Errorf("delete url with query (%s): %w", formatQuery(q), err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 // Ping verifies the connection to the database is alive.

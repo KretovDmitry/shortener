@@ -58,6 +58,7 @@ func Authorization(next http.Handler) http.Handler {
 		authCookie, err := r.Cookie("Authorization")
 		if err != nil {
 			if err == http.ErrNoCookie {
+				l.Info("Authorization cookie not found")
 				ctx := user.NewContext(r.Context(), &user.User{ID: uuid.NewString()})
 
 				next.ServeHTTP(w, r.WithContext(ctx))

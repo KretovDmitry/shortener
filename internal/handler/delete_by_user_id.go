@@ -3,21 +3,23 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"go.uber.org/zap"
 )
 
-type deleteRequestPayload struct {
-	Urls []models.ShortURL `json:"urls,omitempty"`
-}
-
 // DeleteByUserID deletes a list of shortened URLs owned by a specific user.
 //
 //	DELETE /api/user/urls
 //
-// ["6qxTVvsy", "RTfd56hn", "Jlfd67ds"]
+//	{
+//		 urls:
+//			[
+//				"6qxTVvsy", "RTfd56hn", "Jlfd67ds",
+//			]
+//	}
 //
 //	HTTP/1.1 202 Accepted
 //
@@ -28,6 +30,14 @@ func (h *handler) DeleteByUserID(w http.ResponseWriter, r *http.Request) {
 		// Return a "Bad Request" error if the request method is not "DELETE".
 		h.textError(w, "bad method: "+r.Method,
 			ErrOnlyDeleteMethodIsAllowed, http.StatusBadRequest)
+		return
+	}
+
+	// Check content type.
+	contentType := r.Header.Get("Content-Type")
+	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
+		h.shortenJSONError(w, "bad content-type: "+contentType,
+			ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
 		return
 	}
 
@@ -42,7 +52,7 @@ func (h *handler) DeleteByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode the request body.
-	var payload deleteRequestPayload
+	var payload []string
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		// Return an internal server error if the request body cannot be decoded.
 		h.textError(w, "failed to decode request",
@@ -53,9 +63,9 @@ func (h *handler) DeleteByUserID(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("got delete request", zap.Any("urls", payload))
 
 	// Schedule deletion of the URLs.
-	for _, shortURL := range payload.Urls {
+	for _, shortURL := range payload {
 		h.deleteURLsChan <- &models.URL{
-			ShortURL: shortURL,
+			ShortURL: models.ShortURL(shortURL),
 			UserID:   user.ID,
 		}
 	}

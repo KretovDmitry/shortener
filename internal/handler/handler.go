@@ -82,12 +82,15 @@ func (h *handler) flushDeleteURL() {
 	for {
 		select {
 		case url := <-h.deleteURLsChan:
+			h.logger.Info("incoming delete", zap.Any("url", url))
 			URLs = append(URLs, url)
 
 		case <-ticker.C:
 			if len(URLs) == 0 {
 				continue
 			}
+
+			h.logger.Info("deleting", zap.Int("num", len(URLs)))
 
 			err := h.store.DeleteURLs(context.TODO(), URLs...)
 			if err != nil {

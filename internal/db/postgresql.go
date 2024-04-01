@@ -116,7 +116,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
 	const q = `
 		SELECT
-			id, short_url, original_url
+			id, short_url, original_url, is_deleted
 		FROM
 			url
 		WHERE
@@ -124,7 +124,12 @@ func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models
 	`
 
 	u := new(models.URL)
-	err := pg.store.QueryRowContext(ctx, q, sURL).Scan(&u.ID, &u.ShortURL, &u.OriginalURL)
+	err := pg.store.QueryRowContext(ctx, q, sURL).Scan(
+		&u.ID,
+		&u.ShortURL,
+		&u.OriginalURL,
+		&u.IsDeleted,
+	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, models.ErrNotFound
@@ -195,8 +200,7 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	const q = `
 		UPDATE url
 		SET is_deleted = TRUE
-		WHERE user_id = $1
-		AND short_url = $2
+		WHERE short_url = $1
 	`
 
 	tx, err := pg.store.BeginTx(ctx, nil)
@@ -211,7 +215,7 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	}
 
 	for _, url := range urls {
-		_, err := stmt.ExecContext(ctx, url.UserID, url.ShortURL)
+		_, err := stmt.ExecContext(ctx, url.ShortURL)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {

@@ -50,6 +50,7 @@ func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error
 		for _, record := range s.store {
 			if record.UserID == url.UserID {
 				record.IsDeleted = true
+				break
 			}
 		}
 	}

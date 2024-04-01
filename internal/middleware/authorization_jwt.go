@@ -24,7 +24,7 @@ func OnlyWithToken(next http.Handler) http.Handler {
 		if err != nil {
 			if err == http.ErrNoCookie {
 				http.Error(w, "Authorization cookie not found", http.StatusUnauthorized)
-				l.Info("Authorization cookie not found")
+				l.Debug("Authorization cookie not found")
 				return
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -37,7 +37,7 @@ func OnlyWithToken(next http.Handler) http.Handler {
 			return
 		}
 
-		l.Info("JWT token contains user ID", zap.String("id", id))
+		l.Debug("JWT token contains user ID", zap.String("id", id))
 		ctx := user.NewContext(r.Context(), &user.User{ID: id})
 
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -58,7 +58,7 @@ func Authorization(next http.Handler) http.Handler {
 		authCookie, err := r.Cookie("Authorization")
 		if err != nil {
 			if err == http.ErrNoCookie {
-				l.Info("Authorization cookie not found")
+				l.Debug("Authorization cookie not found")
 				ctx := user.NewContext(r.Context(), &user.User{ID: uuid.NewString()})
 
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -74,7 +74,7 @@ func Authorization(next http.Handler) http.Handler {
 			return
 		}
 
-		l.Info("JWT token contains user ID", zap.String("id", id))
+		l.Debug("JWT token contains user ID", zap.String("id", id))
 		ctx := user.NewContext(r.Context(), &user.User{ID: id})
 
 		next.ServeHTTP(w, r.WithContext(ctx))

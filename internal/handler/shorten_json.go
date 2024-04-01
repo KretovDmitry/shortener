@@ -150,8 +150,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 func (h *handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
 		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
-	}
-	if code >= 400 && code < 500 {
+	} else {
 		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
 	}
 	w.Header().Set("Content-Type", "application/json")

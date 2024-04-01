@@ -22,9 +22,7 @@ import (
 //	}
 //
 //	HTTP/1.1 202 Accepted
-//
-// This endpoint requires the user to be authenticated.
-func (h *handler) DeleteByUserID(w http.ResponseWriter, r *http.Request) {
+func (h *handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	// Check the request method.
 	if r.Method != http.MethodDelete {
 		// Return a "Bad Request" error if the request method is not "DELETE".
@@ -52,7 +50,7 @@ func (h *handler) DeleteByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode the request body.
-	var payload []string
+	var payload []models.ShortURL
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		// Return an internal server error if the request body cannot be decoded.
 		h.textError(w, "failed to decode request",
@@ -60,12 +58,12 @@ func (h *handler) DeleteByUserID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("got delete request", zap.Any("urls", payload))
+	h.logger.Debug("got delete request", zap.Any("urls", payload))
 
 	// Schedule deletion of the URLs.
 	for _, shortURL := range payload {
 		h.deleteURLsChan <- &models.URL{
-			ShortURL: models.ShortURL(shortURL),
+			ShortURL: shortURL,
 			UserID:   user.ID,
 		}
 	}

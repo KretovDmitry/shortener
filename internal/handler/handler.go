@@ -66,7 +66,7 @@ func (h *handler) Register(r chi.Router) {
 	r.Get("/ping", h.PingDB)
 	r.Get("/{shortURL}", h.Redirect)
 
-	r.Delete("/api/user/urls", h.DeleteByUserID)
+	r.Delete("/api/user/urls", h.DeleteURLs)
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Use(middleware.OnlyWithToken)
@@ -82,7 +82,7 @@ func (h *handler) flushDeleteURL() {
 	for {
 		select {
 		case url := <-h.deleteURLsChan:
-			h.logger.Info("incoming delete", zap.Any("url", url))
+			h.logger.Debug("incoming delete", zap.Any("url", url))
 			URLs = append(URLs, url)
 
 		case <-ticker.C:
@@ -90,7 +90,7 @@ func (h *handler) flushDeleteURL() {
 				continue
 			}
 
-			h.logger.Info("deleting", zap.Int("num", len(URLs)))
+			h.logger.Debug("deleting", zap.Int("num", len(URLs)))
 
 			err := h.store.DeleteURLs(context.TODO(), URLs...)
 			if err != nil {

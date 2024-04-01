@@ -197,43 +197,33 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 }
 
 func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
-	const q = `
-		UPDATE url
-		SET is_deleted = TRUE
-		WHERE short_url = $1
-	`
-
-	tx, err := pg.store.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, q)
-	if err != nil {
-		return fmt.Errorf("prepare statement: %w", err)
+	var values []string
+	var args []any
+	for i, url := range urls {
+		values = append(values, fmt.Sprintf("($%d, TRUE)", i+1))
+		args = append(args, url.ShortURL)
 	}
 
-	for _, url := range urls {
-		_, err := stmt.ExecContext(ctx, url.ShortURL)
-		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) {
-				// continue if the record already exists
-				if pgErr.Code == pgerrcode.UniqueViolation {
-					continue
-				}
-				// create a new error with additional context
-				return fmt.Errorf("delete url with query (%s): %w",
-					formatQuery(q), formatPgError(pgErr),
-				)
-			}
+	q := `
+	UPDATE url AS u SET
+		is_deleted = c.is_deleted
+	FROM (values ` + strings.Join(values, ",") + `)
+		AS c(short_url, is_deleted) 
+	WHERE c.short_url = u.short_url;`
 
-			return fmt.Errorf("delete url with query (%s): %w", formatQuery(q), err)
+	_, err := pg.store.ExecContext(ctx, q, args...)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			return fmt.Errorf("delete url with query (%s): %w",
+				formatQuery(q), formatPgError(pgErr),
+			)
 		}
+		return fmt.Errorf("delete url with query (%s): %w",
+			formatQuery(q), err)
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // Ping verifies the connection to the database is alive.

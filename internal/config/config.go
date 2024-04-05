@@ -110,14 +110,15 @@ func (d *duration) Set(s string) error {
 }
 
 var (
-	AddrToRun    = NewNetAddress()
-	AddrToReturn = NewNetAddress()
-	FileStorage  = NewFileStorage()
-	DSN          string
-	LogLevel     string
-	Secret       string
-	JWT          = duration(time.Hour * 3)
-	MigrationDir string
+	AddrToRun       = NewNetAddress()
+	AddrToReturn    = NewNetAddress()
+	FileStorage     = NewFileStorage()
+	DSN             string
+	LogLevel        string
+	Secret          string
+	JWT             = duration(time.Hour * 3)
+	MigrationDir    string
+	ShutdownTimeout = 30 * time.Second
 )
 
 func ParseFlags() error {

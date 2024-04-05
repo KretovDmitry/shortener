@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
@@ -33,39 +34,56 @@ type Handler struct {
 	store          db.URLStorage
 	logger         *zap.Logger
 	deleteURLsChan chan *models.URL
-	wg             sync.WaitGroup
+	wg             *sync.WaitGroup
 	done           chan struct{}
+	bufLen         int
 }
 
-// New constructs a new handlerContext,
+// New constructs a new handler,
 // ensuring that the dependencies are valid values
-func New(store db.URLStorage) (*Handler, error) {
+func New(store db.URLStorage, bufLen int) (*Handler, error) {
 	if store == nil {
 		return nil, errors.New("nil store")
 	}
 
-	newInstance := &Handler{
+	h := &Handler{
 		store:          store,
 		logger:         logger.Get(),
 		deleteURLsChan: make(chan *models.URL),
+		wg:             &sync.WaitGroup{},
 		done:           make(chan struct{}),
+		bufLen:         bufLen,
 	}
 
-	newInstance.wg.Add(1)
-	go newInstance.flushDeleteURL()
+	h.wg.Add(1)
+	go func() {
+		defer h.wg.Done()
+		h.flushDeletedURLs()
+	}()
 
-	return newInstance, nil
+	return h, nil
 }
 
-func (h *Handler) Close() {
+func (h *Handler) Stop() {
 	sync.OnceFunc(func() {
 		close(h.done)
-		h.wg.Wait()
 	})
+
+	ready := make(chan struct{})
+	go func() {
+		defer close(ready)
+		h.wg.Wait()
+	}()
+
+	select {
+	case <-time.After(config.ShutdownTimeout):
+		h.logger.Error("shutdown timeout exceeded")
+	case <-ready:
+	}
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *Handler) Register(r chi.Router) {
+func (h *Handler) Register(r chi.Router) chi.Router {
 	r.Use(middleware.Logger)
 	r.Use(gzip.DefaultHandler().WrapHandler)
 	r.Use(middleware.Unzip)
@@ -84,49 +102,39 @@ func (h *Handler) Register(r chi.Router) {
 		r.Use(middleware.OnlyWithToken)
 		r.Get("/urls", h.GetAllByUserID)
 	})
+
+	return r
 }
 
-func (h *Handler) flushDeleteURL() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer h.wg.Done()
-
-	var URLs []*models.URL
+func (h *Handler) flushDeletedURLs() {
+	URLs := make([]*models.URL, 0, h.bufLen)
 
 	for {
 		select {
 		case url := <-h.deleteURLsChan:
 			h.logger.Info("incoming delete", zap.Any("url", url))
+
 			URLs = append(URLs, url)
 
 		case <-h.done:
-			if len(URLs) == 0 {
+			err := h.store.DeleteURLs(context.TODO(), URLs...)
+			if err != nil {
+				h.logger.Error("failed to delete URLs", zap.Error(err),
+					zap.Int("num", len(URLs)), zap.Any("urls", URLs))
 				return
 			}
+		}
 
+		if len(URLs) == h.bufLen {
 			h.logger.Info("deleting", zap.Int("num", len(URLs)))
 
 			err := h.store.DeleteURLs(context.TODO(), URLs...)
 			if err != nil {
-				h.logger.Error("failed delete URLs", zap.Error(err))
-				return
-			}
-
-			URLs = nil
-
-		case <-ticker.C:
-			if len(URLs) == 0 {
+				h.logger.Error("failed to delete URLs", zap.Error(err))
 				continue
 			}
-
-			h.logger.Info("deleting", zap.Int("num", len(URLs)))
-
-			err := h.store.DeleteURLs(context.TODO(), URLs...)
-			if err != nil {
-				h.logger.Error("failed delete URLs", zap.Error(err))
-				continue
-			}
-
-			URLs = nil
+			// reset buffer capacity
+			URLs = URLs[:0:h.bufLen]
 		}
 	}
 

@@ -61,7 +61,7 @@ type (
 //	},
 //
 // ]
-func (h *handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	defer h.logger.Sync()
 

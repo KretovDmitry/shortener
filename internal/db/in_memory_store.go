@@ -44,7 +44,7 @@ func (s *inMemoryStore) GetAllByUserID(_ context.Context, userID string) ([]*mod
 }
 
 func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
-	s.mu.RLock()
+	s.mu.Lock()
 
 	for _, url := range urls {
 		for shortURL, record := range s.store {
@@ -56,7 +56,7 @@ func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error
 		}
 	}
 
-	s.mu.RUnlock()
+	s.mu.Unlock()
 	return nil
 }
 

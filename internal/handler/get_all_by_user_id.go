@@ -30,7 +30,7 @@ import (
 //	...
 //
 // ]
-func (h *handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 	defer r.Body.Close()
 

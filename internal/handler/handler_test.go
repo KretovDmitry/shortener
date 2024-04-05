@@ -100,7 +100,7 @@ func TestNew(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *handler
+		want    *Handler
 		wantErr bool
 	}{
 		{
@@ -108,7 +108,7 @@ func TestNew(t *testing.T) {
 			args: args{
 				store: emptyMockStore,
 			},
-			want: &handler{
+			want: &Handler{
 				store: emptyMockStore,
 			},
 			wantErr: false,

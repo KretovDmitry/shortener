@@ -25,14 +25,18 @@ func main() {
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
-	mux, err := initService(serverCtx)
+	handler, err := initService(serverCtx)
 	if err != nil {
 		l.Fatal("init service failed", zap.Error(err))
 	}
+	defer handler.Close()
+
+	r := chi.NewRouter()
+	handler.Register(r)
 
 	server := &http.Server{
 		Addr:    config.AddrToRun.String(),
-		Handler: mux,
+		Handler: r,
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -62,7 +66,7 @@ func main() {
 	}
 }
 
-func initService(ctx context.Context) (http.Handler, error) {
+func initService(ctx context.Context) (*handler.Handler, error) {
 	err := config.ParseFlags()
 	if err != nil {
 		return nil, fmt.Errorf("parse flags: %w", err)
@@ -75,11 +79,8 @@ func initService(ctx context.Context) (http.Handler, error) {
 
 	handler, err := handler.New(store)
 	if err != nil {
-		return nil, fmt.Errorf("new handler context: %w", err)
+		return nil, fmt.Errorf("new handler: %w", err)
 	}
 
-	r := chi.NewRouter()
-	handler.Register(r)
-
-	return r, nil
+	return handler, nil
 }

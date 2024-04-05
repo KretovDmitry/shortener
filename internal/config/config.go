@@ -92,27 +92,19 @@ func (fs *fileStorage) WriteRequired() bool {
 	return fs.writeRequired
 }
 
-type JWTExpiration struct {
-	Expiration time.Duration
+type duration time.Duration
+
+func (d *duration) String() string {
+	return time.Duration(*d).String()
 }
 
-func NewJWTExpiration() *JWTExpiration {
-	return &JWTExpiration{
-		Expiration: time.Hour * 3,
-	}
-}
-
-func (e *JWTExpiration) String() string {
-	return e.Expiration.String()
-}
-
-func (e *JWTExpiration) Set(s string) error {
-	d, err := time.ParseDuration(s)
+func (d *duration) Set(s string) error {
+	dd, err := time.ParseDuration(s)
 	if err != nil {
 		return err
 	}
 
-	e.Expiration = d
+	*d = duration(dd)
 
 	return nil
 }
@@ -124,16 +116,21 @@ var (
 	DSN          string
 	LogLevel     string
 	Secret       string
-	JWT          = NewJWTExpiration()
+	JWT          = duration(time.Hour * 3)
 	MigrationDir string
 )
 
 func ParseFlags() error {
+	var (
+		_ flag.Value = (*netAddress)(nil)
+		_ flag.Value = (*fileStorage)(nil)
+		_ flag.Value = (*duration)(nil)
+	)
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
 	flag.Var(FileStorage, "f", "File storage path")
-	flag.Var(JWT, "j", `JWT lifetime in form of time.Duration: such as "2h45m".`)
+	flag.Var(&JWT, "j", `JWT lifetime in form of time.Duration: such as "2h45m"`)
 	flag.StringVar(&DSN, "d", "", "Data source name in form postgres URL or DSN string")
 	flag.StringVar(&LogLevel, "l", "info", "Log level")
 	flag.StringVar(&Secret, "s", "test", "Secret key for JWT")

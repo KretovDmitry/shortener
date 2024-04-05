@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/db"
@@ -18,12 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type handler struct {
-	store          db.URLStorage
-	logger         *zap.Logger
-	deleteURLsChan chan *models.URL
-}
-
 var (
 	ErrOnlyGETMethodIsAllowed         = errors.New("only GET method is allowed")
 	ErrOnlyPOSTMethodIsAllowed        = errors.New("only POST method is allowed")
@@ -34,26 +29,43 @@ var (
 	ErrNotValidURL                    = errors.New("URL is not valid")
 )
 
+type Handler struct {
+	store          db.URLStorage
+	logger         *zap.Logger
+	deleteURLsChan chan *models.URL
+	wg             sync.WaitGroup
+	done           chan struct{}
+}
+
 // New constructs a new handlerContext,
 // ensuring that the dependencies are valid values
-func New(store db.URLStorage) (*handler, error) {
+func New(store db.URLStorage) (*Handler, error) {
 	if store == nil {
 		return nil, errors.New("nil store")
 	}
 
-	newInstance := &handler{
+	newInstance := &Handler{
 		store:          store,
 		logger:         logger.Get(),
 		deleteURLsChan: make(chan *models.URL),
+		done:           make(chan struct{}),
 	}
 
+	newInstance.wg.Add(1)
 	go newInstance.flushDeleteURL()
 
 	return newInstance, nil
 }
 
+func (h *Handler) Close() {
+	sync.OnceFunc(func() {
+		close(h.done)
+		h.wg.Wait()
+	})
+}
+
 // Register sets up the routes for the HTTP server.
-func (h *handler) Register(r chi.Router) {
+func (h *Handler) Register(r chi.Router) {
 	r.Use(middleware.Logger)
 	r.Use(gzip.DefaultHandler().WrapHandler)
 	r.Use(middleware.Unzip)
@@ -74,23 +86,39 @@ func (h *handler) Register(r chi.Router) {
 	})
 }
 
-func (h *handler) flushDeleteURL() {
+func (h *Handler) flushDeleteURL() {
 	ticker := time.NewTicker(10 * time.Second)
+	defer h.wg.Done()
 
 	var URLs []*models.URL
 
 	for {
 		select {
 		case url := <-h.deleteURLsChan:
-			h.logger.Debug("incoming delete", zap.Any("url", url))
+			h.logger.Info("incoming delete", zap.Any("url", url))
 			URLs = append(URLs, url)
+
+		case <-h.done:
+			if len(URLs) == 0 {
+				return
+			}
+
+			h.logger.Info("deleting", zap.Int("num", len(URLs)))
+
+			err := h.store.DeleteURLs(context.TODO(), URLs...)
+			if err != nil {
+				h.logger.Error("failed delete URLs", zap.Error(err))
+				return
+			}
+
+			URLs = nil
 
 		case <-ticker.C:
 			if len(URLs) == 0 {
 				continue
 			}
 
-			h.logger.Debug("deleting", zap.Int("num", len(URLs)))
+			h.logger.Info("deleting", zap.Int("num", len(URLs)))
 
 			err := h.store.DeleteURLs(context.TODO(), URLs...)
 			if err != nil {
@@ -105,7 +133,7 @@ func (h *handler) flushDeleteURL() {
 }
 
 // textError writes error response to the response writer in a text/plain format.
-func (h *handler) textError(w http.ResponseWriter, message string, err error, code int) {
+func (h *Handler) textError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
 		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
 	} else {

@@ -50,7 +50,7 @@ type (
 //		"success": true
 //		"message": "OK"
 //	}
-func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 	defer r.Body.Close()
 
@@ -104,7 +104,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
 
 	// Build the JWT authentication token.
-	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, config.JWT.Expiration)
+	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
 	if err != nil {
 		h.shortenJSONError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
@@ -130,7 +130,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(config.JWT.Expiration),
+		Expires:  time.Now().Add(time.Duration(config.JWT)),
 		HttpOnly: true,
 	})
 
@@ -147,7 +147,7 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 // shortenJSONError is a helper function that sets the appropriate response
 // headers and status code for errors returned by the ShortenJSON endpoint.
-func (h *handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
+func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
 		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
 	} else {

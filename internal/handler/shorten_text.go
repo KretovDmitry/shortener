@@ -18,7 +18,7 @@ import (
 )
 
 // ShortenText handles the shortening of a long URL.
-func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	// Check the request method.
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
@@ -73,7 +73,7 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	newRecord := models.NewRecord(generatedShortURL, originalURL, user.ID)
 
 	// Build the JWT authentication token.
-	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, config.JWT.Expiration)
+	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
 	if err != nil {
 		h.textError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
@@ -99,7 +99,7 @@ func (h *handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(config.JWT.Expiration),
+		Expires:  time.Now().Add(time.Duration(config.JWT)),
 		HttpOnly: true,
 	})
 

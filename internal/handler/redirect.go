@@ -12,7 +12,7 @@ import (
 var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]{8}$`)
 
 // Redirect serves a redirect to the original URL based on the shortened URL.
-func (h *handler) Redirect(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 	defer r.Body.Close()
 

@@ -22,7 +22,7 @@ import (
 //	}
 //
 //	HTTP/1.1 202 Accepted
-func (h *handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	// Check the request method.
 	if r.Method != http.MethodDelete {
 		// Return a "Bad Request" error if the request method is not "DELETE".
@@ -58,7 +58,7 @@ func (h *handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Debug("got delete request", zap.Any("urls", payload))
+	h.logger.Info("got delete request", zap.Any("urls", payload))
 
 	// Schedule deletion of the URLs.
 	for _, shortURL := range payload {

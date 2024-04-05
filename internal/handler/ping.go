@@ -10,7 +10,7 @@ import (
 // PingDB checks the status of the database connection.
 //
 // Method: GET
-func (h *handler) PingDB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 	defer r.Body.Close()
 

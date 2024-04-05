@@ -67,7 +67,7 @@ func New(store db.URLStorage, bufLen int) (*Handler, error) {
 func (h *Handler) Stop() {
 	sync.OnceFunc(func() {
 		close(h.done)
-	})
+	})()
 
 	ready := make(chan struct{})
 	go func() {
@@ -77,8 +77,9 @@ func (h *Handler) Stop() {
 
 	select {
 	case <-time.After(config.ShutdownTimeout):
-		h.logger.Error("shutdown timeout exceeded")
+		h.logger.Error("handler stop: shutdown timeout exceeded")
 	case <-ready:
+		return
 	}
 }
 
@@ -107,37 +108,48 @@ func (h *Handler) Register(r chi.Router) chi.Router {
 }
 
 func (h *Handler) flushDeletedURLs() {
+	ticker := time.NewTicker(10 * time.Second)
 	URLs := make([]*models.URL, 0, h.bufLen)
 
 	for {
 		select {
 		case url := <-h.deleteURLsChan:
-			h.logger.Info("incoming delete", zap.Any("url", url))
-
 			URLs = append(URLs, url)
 
 		case <-h.done:
-			err := h.store.DeleteURLs(context.TODO(), URLs...)
-			if err != nil {
-				h.logger.Error("failed to delete URLs", zap.Error(err),
-					zap.Int("num", len(URLs)), zap.Any("urls", URLs))
+			if len(URLs) == 0 {
 				return
 			}
-		}
+			_ = h.flush(URLs...)
+			return
 
-		if len(URLs) == h.bufLen {
-			h.logger.Info("deleting", zap.Int("num", len(URLs)))
-
-			err := h.store.DeleteURLs(context.TODO(), URLs...)
-			if err != nil {
-				h.logger.Error("failed to delete URLs", zap.Error(err))
+		case <-ticker.C:
+			if len(URLs) == 0 {
 				continue
 			}
-			// reset buffer capacity
+			if err := h.flush(URLs...); err != nil {
+				continue
+			}
+			// reset buffer only when flush succeeded
 			URLs = URLs[:0:h.bufLen]
 		}
 	}
+}
 
+func (h *Handler) flush(URLs ...*models.URL) error {
+	if len(URLs) == 0 {
+		return nil
+	}
+
+	h.logger.Info("deleting", zap.Int("num", len(URLs)))
+
+	err := h.store.DeleteURLs(context.TODO(), URLs...)
+	if err != nil {
+		h.logger.Error("failed to delete URLs", zap.Error(err),
+			zap.Int("num", len(URLs)), zap.Any("urls", URLs))
+	}
+
+	return err
 }
 
 // textError writes error response to the response writer in a text/plain format.

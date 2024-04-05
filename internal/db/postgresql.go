@@ -197,6 +197,10 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 }
 
 func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
+	if len(urls) == 0 {
+		return nil
+	}
+
 	var values []string
 	var args []any
 	for i, url := range urls {

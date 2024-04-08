@@ -108,7 +108,7 @@ func TestPingDB(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store)
+			hctx, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

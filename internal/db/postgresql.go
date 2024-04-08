@@ -88,6 +88,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 	if err != nil {
 		return fmt.Errorf("prepare statement: %w", err)
 	}
+	defer stmt.Close()
 
 	for _, url := range urls {
 		_, err := stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL, url.UserID)
@@ -201,33 +202,35 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 		return nil
 	}
 
-	var values []string
-	var args []any
-	for i, url := range urls {
-		values = append(values, fmt.Sprintf("($%d, TRUE)", i+1))
-		args = append(args, url.ShortURL)
-	}
+	const q = "UPDATE url SET is_deleted = TRUE WHERE short_url = $1;"
 
-	q := `
-	UPDATE url AS u SET
-		is_deleted = c.is_deleted
-	FROM (values ` + strings.Join(values, ",") + `)
-		AS c(short_url, is_deleted) 
-	WHERE c.short_url = u.short_url;`
-
-	_, err := pg.store.ExecContext(ctx, q, args...)
+	tx, err := pg.store.BeginTx(ctx, nil)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, q)
+	if err != nil {
+		return fmt.Errorf("prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, url := range urls {
+		_, err := stmt.ExecContext(ctx, url.ShortURL)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) {
+				return fmt.Errorf("delete url with query (%s): %w",
+					formatQuery(q), formatPgError(pgErr),
+				)
+			}
 			return fmt.Errorf("delete url with query (%s): %w",
-				formatQuery(q), formatPgError(pgErr),
-			)
+				formatQuery(q), err)
 		}
-		return fmt.Errorf("delete url with query (%s): %w",
-			formatQuery(q), err)
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 // Ping verifies the connection to the database is alive.

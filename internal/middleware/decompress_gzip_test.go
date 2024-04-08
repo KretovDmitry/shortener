@@ -18,7 +18,8 @@ func TestUnzip(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		r.Body.Close()
-		w.Write(body)
+		_, err = w.Write(body)
+		require.NoError(t, err)
 	}))
 
 	mockData := []byte("https://test.com")

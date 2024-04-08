@@ -186,7 +186,7 @@ func TestShortenJSON(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			hctx, err := New(tt.store)
+			hctx, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			hctx.ShortenJSON(w, r)

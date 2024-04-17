@@ -4,13 +4,13 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models"
 )
 
 // PingDB checks the status of the database connection.
 //
 // Method: GET
-func (h *handler) PingDB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 	defer r.Body.Close()
 
@@ -22,8 +22,8 @@ func (h *handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.Ping(r.Context()); err != nil {
-		if errors.Is(err, db.ErrDBNotConnected) {
-			h.textError(w, "DB not connected", db.ErrDBNotConnected, http.StatusInternalServerError)
+		if errors.Is(err, models.ErrDBNotConnected) {
+			h.textError(w, "DB not connected", models.ErrDBNotConnected, http.StatusInternalServerError)
 			return
 		}
 		h.textError(w, "connection error", err, http.StatusInternalServerError)

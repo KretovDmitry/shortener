@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/jwt"
+	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
 	"go.uber.org/zap"
@@ -19,9 +23,9 @@ type (
 	}
 
 	shortenJSONResponsePayload struct {
-		Result  db.ShortURL `json:"result"`
-		Success bool        `json:"success"`
-		Message string      `json:"message"`
+		Result  models.ShortURL `json:"result"`
+		Success bool            `json:"success"`
+		Message string          `json:"message"`
 	}
 )
 
@@ -46,7 +50,7 @@ type (
 //		"success": true
 //		"message": "OK"
 //	}
-func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	defer h.logger.Sync()
 	defer r.Body.Close()
 
@@ -91,11 +95,24 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newRecord := db.NewRecord(generatedShortURL, payload.URL)
+	user, ok := user.FromContext(r.Context())
+	if !ok {
+		h.shortenJSONError(w, "failed get user from context",
+			models.ErrInvalidDataType, http.StatusInternalServerError)
+	}
+
+	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
+
+	// Build the JWT authentication token.
+	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
+	if err != nil {
+		h.shortenJSONError(w, "failed to build JWT token", err, http.StatusInternalServerError)
+		return
+	}
 
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, db.ErrConflict) {
+	if err != nil && !errors.Is(err, models.ErrConflict) {
 		h.shortenJSONError(w, "failed to save to database: "+payload.URL, err, http.StatusInternalServerError)
 		return
 	}
@@ -103,14 +120,22 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// Set the response headers and status code
 	w.Header().Set("Content-Type", "application/json")
 	switch {
-	case errors.Is(err, db.ErrConflict):
+	case errors.Is(err, models.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)
 	}
 
+	// Set the "Authorization" cookie with the JWT authentication token.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "Authorization",
+		Value:    authToken,
+		Expires:  time.Now().Add(time.Duration(config.JWT)),
+		HttpOnly: true,
+	})
+
 	// create response payload
-	result := shortenJSONResponsePayload{Result: db.ShortURL(generatedShortURL), Success: true, Message: "OK"}
+	result := shortenJSONResponsePayload{Result: models.ShortURL(generatedShortURL), Success: true, Message: "OK"}
 
 	// encode response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {
@@ -122,11 +147,10 @@ func (h *handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 // shortenJSONError is a helper function that sets the appropriate response
 // headers and status code for errors returned by the ShortenJSON endpoint.
-func (h *handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
+func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
 		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
-	}
-	if code >= 400 && code < 500 {
+	} else {
 		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
 	}
 	w.Header().Set("Content-Type", "application/json")

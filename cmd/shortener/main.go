@@ -25,23 +25,24 @@ func main() {
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
-	mux, err := initService(serverCtx)
+	handler, err := initService(serverCtx)
 	if err != nil {
 		l.Fatal("init service failed", zap.Error(err))
 	}
+	defer handler.Stop()
 
 	server := &http.Server{
 		Addr:    config.AddrToRun.String(),
-		Handler: mux,
+		Handler: handler.Register(chi.NewRouter()),
 	}
 
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT,
+		syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 	go func() {
 		<-sig
 
-		err := server.Shutdown(serverCtx)
-		if err != nil {
+		if err := server.Shutdown(serverCtx); err != nil {
 			l.Fatal("graceful shutdown failed", zap.Error(err))
 		}
 		serverStopCtx()
@@ -57,12 +58,12 @@ func main() {
 	// Wait for server context to be stopped
 	select {
 	case <-serverCtx.Done():
-	case <-time.After(30 * time.Second):
+	case <-time.After(config.ShutdownTimeout):
 		l.Fatal("graceful shutdown timed out.. forcing exit")
 	}
 }
 
-func initService(ctx context.Context) (http.Handler, error) {
+func initService(ctx context.Context) (*handler.Handler, error) {
 	err := config.ParseFlags()
 	if err != nil {
 		return nil, fmt.Errorf("parse flags: %w", err)
@@ -73,13 +74,10 @@ func initService(ctx context.Context) (http.Handler, error) {
 		return nil, fmt.Errorf("new store: %w", err)
 	}
 
-	handler, err := handler.New(store)
+	handler, err := handler.New(store, 5)
 	if err != nil {
-		return nil, fmt.Errorf("new handler context: %w", err)
+		return nil, fmt.Errorf("new handler: %w", err)
 	}
 
-	r := chi.NewRouter()
-	handler.Register(r)
-
-	return r, nil
+	return handler, nil
 }

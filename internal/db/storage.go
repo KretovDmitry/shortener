@@ -5,12 +5,15 @@ import (
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/models"
 )
 
 type URLStorage interface {
-	Save(context.Context, *URL) error
-	SaveAll(context.Context, []*URL) error
-	Get(context.Context, ShortURL) (*URL, error)
+	Save(context.Context, *models.URL) error
+	SaveAll(context.Context, []*models.URL) error
+	Get(context.Context, models.ShortURL) (*models.URL, error)
+	GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error)
+	DeleteURLs(ctx context.Context, urls ...*models.URL) error
 	Ping(context.Context) error
 }
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -181,10 +182,11 @@ func TestShortenJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(tt.method, path, tt.payload)
 			r.Header.Set(contentType, tt.contentType)
+			r = r.WithContext(user.NewContext(r.Context(), &user.User{ID: "test"}))
 
 			w := httptest.NewRecorder()
 
-			hctx, err := New(tt.store)
+			hctx, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			hctx.ShortenJSON(w, r)

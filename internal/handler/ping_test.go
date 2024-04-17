@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +86,7 @@ func TestPingDB(t *testing.T) {
 			store:  &notConnectedStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("DB not connected: %s", db.ErrDBNotConnected),
+				response:   fmt.Sprintf("DB not connected: %s", models.ErrDBNotConnected),
 			},
 		},
 		{
@@ -107,7 +108,7 @@ func TestPingDB(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store)
+			hctx, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

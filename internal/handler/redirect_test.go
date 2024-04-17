@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,7 +140,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				resBody := getResponseTextPayload(t, res)
-				assert.Equal(t, fmt.Sprintf("redirect with url: 2x1xx1x2: %s", db.ErrURLNotFound), resBody)
+				assert.Equal(t, fmt.Sprintf("redirect with url: 2x1xx1x2: %s", models.ErrNotFound), resBody)
 			},
 		},
 		{
@@ -170,7 +171,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store)
+			hctx, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

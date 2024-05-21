@@ -104,7 +104,7 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Write the response body.
-	_, err = w.Write([]byte(fmt.Sprintf("http://%s/%s", config.AddrToReturn, generatedShortURL)))
+	_, err = fmt.Fprintf(w, "http://%s/%s", config.AddrToReturn, generatedShortURL)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)

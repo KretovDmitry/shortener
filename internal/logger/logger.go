@@ -16,10 +16,8 @@ import (
 
 type loggerCtxKey struct{}
 
-var once sync.Once
-
 func Get() *zap.Logger {
-	once.Do(func() {
+	sync.OnceFunc(func() {
 		stdout := zapcore.AddSync(os.Stdout)
 
 		file := zapcore.AddSync(&lumberjack.Logger{
@@ -30,7 +28,6 @@ func Get() *zap.Logger {
 			Compress:   true,
 		})
 
-		level := zap.InfoLevel
 		levelFromEnv, err := zapcore.ParseLevel(config.LogLevel)
 		if err != nil {
 			log.Println(
@@ -38,9 +35,7 @@ func Get() *zap.Logger {
 			)
 		}
 
-		level = levelFromEnv
-
-		logLevel := zap.NewAtomicLevelAt(level)
+		logLevel := zap.NewAtomicLevelAt(levelFromEnv)
 
 		productionCfg := zap.NewProductionEncoderConfig()
 		productionCfg.TimeKey = "timestamp"
@@ -77,7 +72,7 @@ func Get() *zap.Logger {
 		)
 
 		zap.ReplaceGlobals(zap.New(core))
-	})
+	})()
 
 	return zap.L()
 }
@@ -96,7 +91,7 @@ func FromCtx(ctx context.Context) *zap.Logger {
 func WithCtx(ctx context.Context, l *zap.Logger) context.Context {
 	if lp, ok := ctx.Value(loggerCtxKey{}).(*zap.Logger); ok {
 		if lp == l {
-			// Do not store same logger.
+			// Do not store the same logger.
 			return ctx
 		}
 	}

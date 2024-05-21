@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"

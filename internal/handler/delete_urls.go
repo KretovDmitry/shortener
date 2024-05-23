@@ -31,7 +31,7 @@ func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check content type.
-	if h.IsApplicationJSONContentType(r) {
+	if !h.IsApplicationJSONContentType(r) {
 		h.textError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}

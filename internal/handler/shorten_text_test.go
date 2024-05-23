@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,7 +58,9 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store: initMockStore(&models.URL{
+				OriginalURL: "https://go.dev/",
+			}),
 			want: want{
 				statusCode: http.StatusConflict,
 				response:   "YBbxJEcQ",

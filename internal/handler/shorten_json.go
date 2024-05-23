@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
@@ -52,26 +51,22 @@ type (
 //		"message": "OK"
 //	}
 func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
-	defer h.logger.Sync()
-	defer r.Body.Close()
-
 	// check request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
-		h.shortenJSONError(w, "bad method: "+r.Method, ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
+		h.textError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// check content type
-	contentType := r.Header.Get("Content-Type")
-	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		h.shortenJSONError(w, "bad content-type: "+contentType,
-			ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
+	if h.IsApplicationJSONContentType(r) {
+		h.shortenJSONError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// decode request body
 	var payload shortenJSONRequestPayload
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		h.shortenJSONError(w, "failed to decode request", err, http.StatusInternalServerError)
 		return
@@ -79,20 +74,20 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// check if URL is provided
 	if len(payload.URL) == 0 {
-		h.shortenJSONError(w, "url field is empty", ErrURLIsNotProvided, http.StatusBadRequest)
+		h.shortenJSONError(w, "URL is not provided", errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// check if URL is a valid URL
 	if !govalidator.IsURL(payload.URL) {
-		h.shortenJSONError(w, "shorten url: "+payload.URL, ErrNotValidURL, http.StatusBadRequest)
+		h.shortenJSONError(w, "invalid URL", errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// generate short URL
 	generatedShortURL, err := shorturl.Generate(payload.URL)
 	if err != nil {
-		h.shortenJSONError(w, "failed to shorten url: "+payload.URL, err, http.StatusInternalServerError)
+		h.shortenJSONError(w, "failed to shorten url", err, http.StatusInternalServerError)
 		return
 	}
 
@@ -114,7 +109,7 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
 	if err != nil && !errors.Is(err, errs.ErrConflict) {
-		h.shortenJSONError(w, "failed to save to database: "+payload.URL, err, http.StatusInternalServerError)
+		h.shortenJSONError(w, "failed to save to database", err, http.StatusInternalServerError)
 		return
 	}
 

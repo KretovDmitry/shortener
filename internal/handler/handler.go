@@ -20,16 +20,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	ErrOnlyGETMethodIsAllowed         = errors.New("only GET method is allowed")
-	ErrOnlyPOSTMethodIsAllowed        = errors.New("only POST method is allowed")
-	ErrOnlyDeleteMethodIsAllowed      = errors.New("only DELETE method is allowed")
-	ErrOnlyApplicationJSONContentType = errors.New("only application/json content-type is allowed")
-	ErrOnlyTextPlainContentType       = errors.New("only text/plain content-type is allowed")
-	ErrURLIsNotProvided               = errors.New("URL is not provided")
-	ErrNotValidURL                    = errors.New("URL is not valid")
-)
-
 type Handler struct {
 	store          db.URLStorage
 	logger         *zap.Logger

@@ -37,7 +37,7 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodGet {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
-		h.textError(w, "bad method: "+r.Method, ErrOnlyGETMethodIsAllowed, http.StatusBadRequest)
+		h.textError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 

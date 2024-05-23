@@ -9,16 +9,18 @@ import (
 	"github.com/KretovDmitry/shortener/internal/models"
 )
 
-type inMemoryStore struct {
-	mu    sync.RWMutex
+var _ URLStorage = (*InMemoryStore)(nil)
+
+type InMemoryStore struct {
 	store map[models.ShortURL]models.URL
+	mu    sync.RWMutex
 }
 
-func NewInMemoryStore() *inMemoryStore {
-	return &inMemoryStore{store: make(map[models.ShortURL]models.URL)}
+func NewInMemoryStore() *InMemoryStore {
+	return &InMemoryStore{store: make(map[models.ShortURL]models.URL)}
 }
 
-func (s *inMemoryStore) Get(_ context.Context, sURL models.ShortURL) (*models.URL, error) {
+func (s *InMemoryStore) Get(_ context.Context, sURL models.ShortURL) (*models.URL, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -30,7 +32,7 @@ func (s *inMemoryStore) Get(_ context.Context, sURL models.ShortURL) (*models.UR
 	return &record, nil
 }
 
-func (s *inMemoryStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
+func (s *InMemoryStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
 	s.mu.RLock()
 
 	all := make([]*models.URL, 0)
@@ -44,7 +46,7 @@ func (s *inMemoryStore) GetAllByUserID(_ context.Context, userID string) ([]*mod
 	return all, nil
 }
 
-func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
+func (s *InMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
 	s.mu.Lock()
 
 	for _, url := range urls {
@@ -61,20 +63,30 @@ func (s *inMemoryStore) DeleteURLs(_ context.Context, urls ...*models.URL) error
 	return nil
 }
 
-func (s *inMemoryStore) Save(u *models.URL) error {
+func (s *InMemoryStore) Save(_ context.Context, u *models.URL) error {
 	s.mu.Lock()
+	if _, ok := s.store[u.ShortURL]; ok {
+		return errs.ErrConflict
+	}
 	s.store[u.ShortURL] = *u
 	s.mu.Unlock()
 
 	return nil
 }
 
-func (s *inMemoryStore) SaveAll(_ context.Context, u []*models.URL) error {
+func (s *InMemoryStore) SaveAll(_ context.Context, u []*models.URL) error {
 	s.mu.Lock()
 	for _, u := range u {
+		if _, ok := s.store[u.ShortURL]; ok {
+			return errs.ErrConflict
+		}
 		s.store[u.ShortURL] = *u
 	}
 	s.mu.Unlock()
 
 	return nil
+}
+
+func (s *InMemoryStore) Ping(_ context.Context) error {
+	return errs.ErrDBNotConnected
 }

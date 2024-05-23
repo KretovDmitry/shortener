@@ -23,45 +23,19 @@ const (
 
 var (
 	errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
-	emptyMockStore                   = &mockStore{expectedData: ""}
+	emptyMockStore                   = initMockStore(&models.URL{OriginalURL: ""})
 )
 
-// mokeStore must implement URLStore interface
+var _ db.URLStorage = (*mockStore)(nil)
+
 type mockStore struct {
-	expectedData string
+	db.URLStorage
 }
 
-// do nothing on create, return ErrConflict if URL already exists
-func (s *mockStore) Save(ctx context.Context, url *models.URL) error {
-	if s.expectedData == string(url.OriginalURL) {
-		return errs.ErrConflict
-	}
-	return nil
-}
-
-func (s *mockStore) SaveAll(context.Context, []*models.URL) error {
-	return nil
-}
-
-// return expected data
-func (s *mockStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
-	// mock not found error
-	if s.expectedData == "" {
-		return nil, errs.ErrNotFound
-	}
-	return &models.URL{OriginalURL: models.OriginalURL(s.expectedData)}, nil
-}
-
-func (s *mockStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
-	return nil, nil
-}
-
-func (s *mockStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
-	return nil
-}
-
-func (s *mockStore) Ping(context.Context) error {
-	return nil
+func initMockStore(u *models.URL) *mockStore {
+	inMem := db.NewInMemoryStore()
+	_ = inMem.Save(context.TODO(), u)
+	return &mockStore{inMem}
 }
 
 // simulating errors with storage operations
@@ -100,8 +74,6 @@ func (s *notConnectedStore) Ping(context.Context) error {
 }
 
 func TestNew(t *testing.T) {
-	emptyMockStore := &mockStore{expectedData: ""}
-
 	type args struct {
 		store db.URLStorage
 	}

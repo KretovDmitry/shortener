@@ -10,6 +10,7 @@ import (
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +72,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store:       initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,

@@ -61,7 +61,7 @@ func (c *Consumer) ReadRecord() (*models.URL, error) {
 }
 
 type fileStore struct {
-	cache *inMemoryStore
+	cache *InMemoryStore
 	file  *Producer
 }
 
@@ -79,7 +79,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 	for {
 		record, err := consumer.ReadRecord()
 		if record != nil {
-			if err = fileStore.cache.Save(record); err != nil {
+			if err = fileStore.cache.Save(context.TODO(), record); err != nil {
 				return nil, fmt.Errorf("save record: %w", err)
 			}
 		}
@@ -137,7 +137,7 @@ func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 	}
 
 	// save the record to the cache if writing to the file was successful if required
-	return fs.cache.Save(url)
+	return fs.cache.Save(ctx, url)
 }
 
 // SaveAll saves multiple URL records to the file and cache.
@@ -162,7 +162,7 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 		}
 
 		// save the record to the cache if writing to the file was successful if required
-		if err = fs.cache.Save(url); err != nil {
+		if err = fs.cache.Save(ctx, url); err != nil {
 			return fmt.Errorf("save record: %w", err)
 		}
 	}

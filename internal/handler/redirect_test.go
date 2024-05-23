@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "positive test #1",
 			method:   http.MethodGet,
 			shortURL: "TZqSKV4t",
-			store:    &mockStore{expectedData: "https://e.mail.ru/inbox/"},
+			store:    initMockStore(&models.URL{OriginalURL: "https://e.mail.ru/inbox/"}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
@@ -37,7 +38,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "positive test #2",
 			method:   http.MethodGet,
 			shortURL: "YBbxJEcQ",
-			store:    &mockStore{expectedData: "https://go.dev/"},
+			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
@@ -48,7 +49,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid method: method post",
 			method:   http.MethodPost,
 			shortURL: "YBbxJEcQ",
-			store:    &mockStore{expectedData: "https://go.dev/"},
+			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -61,7 +62,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid method: method put",
 			method:   http.MethodPut,
 			shortURL: "YBbxJEcQ",
-			store:    &mockStore{expectedData: "https://go.dev/"},
+			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -74,7 +75,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid method: method patch",
 			method:   http.MethodPatch,
 			shortURL: "YBbxJEcQ",
-			store:    &mockStore{expectedData: "https://go.dev/"},
+			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -87,7 +88,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid method: method delete",
 			method:   http.MethodDelete,
 			shortURL: "YBbxJEcQ",
-			store:    &mockStore{expectedData: "https://go.dev/"},
+			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -100,7 +101,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid url: too long URL",
 			method:   http.MethodGet,
 			shortURL: "Too_Long_URL", // > 8 characters
-			store:    &mockStore{expectedData: ""},
+			store:    emptyMockStore,
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -112,7 +113,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid url: too short URL",
 			method:   http.MethodGet,
 			shortURL: "short", // < 8 characters
-			store:    &mockStore{expectedData: ""},
+			store:    emptyMockStore,
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -124,7 +125,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid url: invalid base58 characters",
 			method:   http.MethodGet,
 			shortURL: "O0Il0O", // 0OIl+/ are not used
-			store:    &mockStore{expectedData: ""},
+			store:    emptyMockStore,
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -136,7 +137,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "no such URL",
 			method:   http.MethodGet,
 			shortURL: "2x1xx1x2",
-			store:    &mockStore{expectedData: ""},
+			store:    emptyMockStore,
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)

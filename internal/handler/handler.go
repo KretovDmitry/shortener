@@ -161,7 +161,7 @@ func (h *Handler) textError(w http.ResponseWriter, message string, err error, co
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(code)
-	_, err = w.Write([]byte(fmt.Sprintf("%s: %s", message, err)))
+	_, err = fmt.Fprintf(w, "%s: %s", err, message)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -176,4 +176,23 @@ func caller(depth int) string {
 	// idx == -1 because no "/" was found, or
 	// idx >= 0 and we want to start at the character after the found "/"
 	return fmt.Sprintf("%s:%d", file[idx+1:], line)
+}
+
+// IsApplicationJSONContentType returns true if the content type of the
+// HTTP request is application/json.
+func (h *Handler) IsApplicationJSONContentType(r *http.Request) bool {
+	contentType := r.Header.Get("Content-Type")
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	return contentType == "application/json"
+}
+
+// IsTextPlainContentType returns true if the content type of the
+// HTTP request is text/plain.
+func (h *Handler) IsTextPlainContentType(r *http.Request) bool {
+	contentType := r.Header.Get("Content-Type")
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	if i := strings.Index(contentType, ";"); i > -1 {
+		contentType = contentType[0:i]
+	}
+	return contentType == "text/plain"
 }

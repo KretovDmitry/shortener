@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
@@ -98,7 +99,7 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	user, ok := user.FromContext(r.Context())
 	if !ok {
 		h.shortenJSONError(w, "failed get user from context",
-			models.ErrInvalidDataType, http.StatusInternalServerError)
+			errs.ErrUnauthorized, http.StatusInternalServerError)
 	}
 
 	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
@@ -112,7 +113,7 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// save URL to database
 	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, models.ErrConflict) {
+	if err != nil && !errors.Is(err, errs.ErrConflict) {
 		h.shortenJSONError(w, "failed to save to database: "+payload.URL, err, http.StatusInternalServerError)
 		return
 	}
@@ -120,7 +121,7 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// Set the response headers and status code
 	w.Header().Set("Content-Type", "application/json")
 	switch {
-	case errors.Is(err, models.ErrConflict):
+	case errors.Is(err, errs.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)

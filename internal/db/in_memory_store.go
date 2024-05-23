@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 )
 
@@ -23,7 +24,7 @@ func (s *inMemoryStore) Get(_ context.Context, sURL models.ShortURL) (*models.UR
 
 	record, found := s.store[sURL]
 	if !found {
-		return nil, fmt.Errorf("%s: %w", record.ShortURL, models.ErrNotFound)
+		return nil, fmt.Errorf("%s: %w", record.ShortURL, errs.ErrNotFound)
 	}
 
 	return &record, nil

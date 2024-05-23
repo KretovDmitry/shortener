@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"go.uber.org/zap"
@@ -42,10 +43,7 @@ func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	// Extract the user from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		// Return an internal server error
-		// if the user cannot be retrieved from the context.
-		h.textError(w, "failed to get user from context",
-			models.ErrInvalidDataType, http.StatusInternalServerError)
+		h.textError(w, "failed to get user from context", errs.ErrUnauthorized, http.StatusInternalServerError)
 		return
 	}
 

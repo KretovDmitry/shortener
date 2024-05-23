@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,8 +21,10 @@ const (
 	applicationJSON = "application/json"
 )
 
-var errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
-var emptyMockStore = &mockStore{expectedData: ""}
+var (
+	errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
+	emptyMockStore                   = &mockStore{expectedData: ""}
+)
 
 // mokeStore must implement URLStore interface
 type mockStore struct {
@@ -31,7 +34,7 @@ type mockStore struct {
 // do nothing on create, return ErrConflict if URL already exists
 func (s *mockStore) Save(ctx context.Context, url *models.URL) error {
 	if s.expectedData == string(url.OriginalURL) {
-		return models.ErrConflict
+		return errs.ErrConflict
 	}
 	return nil
 }
@@ -44,10 +47,11 @@ func (s *mockStore) SaveAll(context.Context, []*models.URL) error {
 func (s *mockStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
 	// mock not found error
 	if s.expectedData == "" {
-		return nil, models.ErrNotFound
+		return nil, errs.ErrNotFound
 	}
 	return &models.URL{OriginalURL: models.OriginalURL(s.expectedData)}, nil
 }
+
 func (s *mockStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
 	return nil, nil
 }
@@ -55,6 +59,7 @@ func (s *mockStore) GetAllByUserID(_ context.Context, userID string) ([]*models.
 func (s *mockStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
 	return nil
 }
+
 func (s *mockStore) Ping(context.Context) error {
 	return nil
 }
@@ -65,6 +70,7 @@ type brokenStore struct{}
 func (s *brokenStore) Save(context.Context, *models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
+
 func (s *brokenStore) SaveAll(context.Context, []*models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
@@ -72,9 +78,11 @@ func (s *brokenStore) SaveAll(context.Context, []*models.URL) error {
 func (s *brokenStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
 	return nil, errIntentionallyNotWorkingMethod
 }
+
 func (s *brokenStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
 	return nil, nil
 }
+
 func (s *brokenStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
 	return nil
 }
@@ -88,7 +96,7 @@ type notConnectedStore struct {
 }
 
 func (s *notConnectedStore) Ping(context.Context) error {
-	return models.ErrDBNotConnected
+	return errs.ErrDBNotConnected
 }
 
 func TestNew(t *testing.T) {

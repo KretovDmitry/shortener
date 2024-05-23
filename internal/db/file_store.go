@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 )
 
@@ -18,7 +19,7 @@ type Producer struct {
 }
 
 func NewProducer(fileName string) (*Producer, error) {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o666)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +40,7 @@ type Consumer struct {
 }
 
 func NewConsumer(fileName string) (*Consumer, error) {
-	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
+	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0o644)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +120,13 @@ func (fs *fileStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error 
 func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 	// check if the record already exists in the cache
 	record, err := fs.cache.Get(ctx, url.ShortURL)
-	if err != nil && !errors.Is(err, models.ErrNotFound) {
+	if err != nil && !errors.Is(err, errs.ErrNotFound) {
 		return err
 	}
 
 	// if the record already exists return ErrConflict
 	if record != nil && record.OriginalURL == url.OriginalURL {
-		return models.ErrConflict
+		return errs.ErrConflict
 	}
 
 	// write the record to the file if required
@@ -144,7 +145,7 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 	for _, url := range urls {
 		// check if the record already exists in the cache
 		record, err := fs.cache.Get(ctx, url.ShortURL)
-		if err != nil && !errors.Is(err, models.ErrNotFound) {
+		if err != nil && !errors.Is(err, errs.ErrNotFound) {
 			return err
 		}
 
@@ -171,5 +172,5 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 
 // fileStore Ping method tells that the real database is not connected.
 func (fs *fileStore) Ping(context.Context) error {
-	return models.ErrDBNotConnected
+	return errs.ErrDBNotConnected
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"go.uber.org/zap"
 )
@@ -44,13 +44,12 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "failed get user from context",
-			models.ErrInvalidDataType, http.StatusInternalServerError)
+		h.textError(w, "failed get user from context", errs.ErrUnauthorized, http.StatusInternalServerError)
 	}
 
 	URLs, err := h.store.GetAllByUserID(r.Context(), user.ID)
 	if err != nil {
-		if errors.Is(err, models.ErrNotFound) {
+		if errors.Is(err, errs.ErrNotFound) {
 			w.WriteHeader(http.StatusNoContent)
 			h.logger.Info("No URLs found for user", zap.String("userID", user.ID))
 			return

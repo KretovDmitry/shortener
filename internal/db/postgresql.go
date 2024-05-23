@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -53,7 +54,7 @@ func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
 		if errors.As(err, &pgErr) {
 			// return ErrConflict if the record already exists
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return models.ErrConflict
+				return errs.ErrConflict
 			}
 			// create a new error with additional context
 			return fmt.Errorf("save url with query (%s): %w",
@@ -133,7 +134,7 @@ func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, models.ErrNotFound
+			return nil, errs.ErrNotFound
 		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -191,7 +192,7 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 	}
 
 	if len(all) == 0 {
-		return nil, models.ErrNotFound
+		return nil, errs.ErrNotFound
 	}
 
 	return all, nil

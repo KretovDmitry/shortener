@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestShortenBatch(t *testing.T) {
 		{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":"https://e.mail.ru/inbox/"}
 	]`
 
-	happyResponse := fmt.Sprintf(`[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/eDKZ8wBC"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://%[1]s/be8xnp4H"}]`,
+	happyResponse := fmt.Sprintf(`[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/YBbxJEcQ"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://%[1]s/TZqSKV4t"}]`,
 		config.AddrToReturn)
 
 	const invalidJSON = `
@@ -84,7 +85,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodGet, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodGet),
 			},
 		},
 		{
@@ -95,7 +96,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
 			},
 		},
 		{
@@ -106,7 +107,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
 			},
 		},
 		{
@@ -117,7 +118,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
 			},
 		},
 		{
@@ -128,7 +129,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad content-type: %s: %s", textPlain, ErrOnlyApplicationJSONContentType),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, textPlain),
 			},
 		},
 		{
@@ -139,7 +140,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   "failed to decode request",
+				response:   errs.ErrInvalidRequest.Error(),
 			},
 			wantErr: true,
 		},
@@ -151,7 +152,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   "failed to decode request",
+				response:   errs.ErrInvalidRequest.Error(),
 			},
 			wantErr: true,
 		},
@@ -163,7 +164,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("url field is empty: %s", ErrURLIsNotProvided),
+				response:   fmt.Sprintf("%s: URL is not provided", errs.ErrInvalidRequest),
 			},
 		},
 		{
@@ -174,7 +175,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("shorten url: https://test...com: %s", ErrNotValidURL),
+				response:   fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest),
 			},
 		},
 		{
@@ -185,7 +186,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("failed to save to database: %s", errIntentionallyNotWorkingMethod),
+				response:   fmt.Sprintf("%s: failed to save to database", errIntentionallyNotWorkingMethod),
 			},
 		},
 	}
@@ -198,7 +199,7 @@ func TestShortenBatch(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			hctx, err := New(tt.store, 5)
-			require.NoError(t, err, "new handler context error")
+			require.NoError(t, err, "new handler error")
 
 			hctx.ShortenBatch(w, r)
 
@@ -217,7 +218,6 @@ func TestShortenBatch(t *testing.T) {
 			case !tt.wantErr:
 				assert.Equal(t, tt.want.response, response)
 			}
-
 		})
 	}
 }

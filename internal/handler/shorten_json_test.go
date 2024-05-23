@@ -40,7 +40,7 @@ func TestShortenJSON(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusCreated,
-				response:   "be8xnp4H",
+				response:   "TZqSKV4t",
 			},
 			wantErr: false,
 		},
@@ -52,7 +52,7 @@ func TestShortenJSON(t *testing.T) {
 			store:       emptyMockStore,
 			want: want{
 				statusCode: http.StatusCreated,
-				response:   "eDKZ8wBC",
+				response:   "YBbxJEcQ",
 			},
 			wantErr: false,
 		},
@@ -64,7 +64,7 @@ func TestShortenJSON(t *testing.T) {
 			store:       &mockStore{expectedData: "https://go.dev/"},
 			want: want{
 				statusCode: http.StatusConflict,
-				response:   "eDKZ8wBC",
+				response:   "YBbxJEcQ",
 			},
 			wantErr: false,
 		},

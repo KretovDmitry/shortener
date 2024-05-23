@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,7 +50,7 @@ func TestPingDB(t *testing.T) {
 			store:  emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPost, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPost),
 			},
 		},
 		{
@@ -59,7 +59,7 @@ func TestPingDB(t *testing.T) {
 			store:  emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
 			},
 		},
 		{
@@ -68,7 +68,7 @@ func TestPingDB(t *testing.T) {
 			store:  emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
 			},
 		},
 		{
@@ -77,7 +77,7 @@ func TestPingDB(t *testing.T) {
 			store:  emptyMockStore,
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
 			},
 		},
 		{
@@ -86,7 +86,7 @@ func TestPingDB(t *testing.T) {
 			store:  &notConnectedStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("DB not connected: %s", models.ErrDBNotConnected),
+				response:   fmt.Sprintf("%s: DB not connected", errs.ErrDBNotConnected),
 			},
 		},
 		{
@@ -95,7 +95,7 @@ func TestPingDB(t *testing.T) {
 			store:  &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("connection error: %s", errIntentionallyNotWorkingMethod),
+				response:   fmt.Sprintf("%s: connection error", errIntentionallyNotWorkingMethod),
 			},
 		},
 	}

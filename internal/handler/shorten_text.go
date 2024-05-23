@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
@@ -19,21 +20,21 @@ import (
 
 // ShortenText handles the shortening of a long URL.
 func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
-	// Check the request method.
+	// check the request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
-		h.textError(w, "bad method: "+r.Method, ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
+		h.textError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// Check the content type.
-	contentType := r.Header.Get("Content-Type")
-	if r.Header.Get("Content-Encoding") == "" && !isTextPlainContentType(contentType) {
-		h.textError(w, "bad content-type: "+contentType, ErrOnlyTextPlainContentType, http.StatusBadRequest)
+	if r.Header.Get("Content-Encoding") == "" && !h.IsTextPlainContentType(r) {
+		h.textError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// Read the request body.
+	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.textError(w, "failed to read request body", err, http.StatusInternalServerError)
@@ -42,7 +43,7 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the URL is provided.
 	if len(body) == 0 {
-		h.textError(w, "body is empty", ErrURLIsNotProvided, http.StatusBadRequest)
+		h.textError(w, "URL is not provided", errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
@@ -51,7 +52,7 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the URL is a valid URL.
 	if !govalidator.IsURL(originalURL) {
-		h.textError(w, "shorten url: "+originalURL, ErrNotValidURL, http.StatusBadRequest)
+		h.textError(w, "invalid URL", errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
@@ -65,8 +66,7 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "failed get user from context",
-			models.ErrInvalidDataType, http.StatusInternalServerError)
+		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
 	}
 
 	// Create a new record with the generated short URL, original URL, and user ID.
@@ -81,15 +81,15 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 
 	// Save the record to the database.
 	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, models.ErrConflict) {
-		h.textError(w, "failed to save to database: "+originalURL, err, http.StatusInternalServerError)
+	if err != nil && !errors.Is(err, errs.ErrConflict) {
+		h.textError(w, "failed to save to database", err, http.StatusInternalServerError)
 		return
 	}
 
 	// Set the response headers and status code.
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	switch {
-	case errors.Is(err, models.ErrConflict):
+	case errors.Is(err, errs.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)

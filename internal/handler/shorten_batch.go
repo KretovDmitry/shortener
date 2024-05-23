@@ -3,8 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
@@ -62,67 +62,60 @@ type (
 //
 // ]
 func (h *Handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	defer h.logger.Sync()
-
 	// check the request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
-		h.textError(w, "bad method: "+r.Method, ErrOnlyPOSTMethodIsAllowed, http.StatusBadRequest)
+		h.textError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// check content type
-	contentType := r.Header.Get("Content-Type")
-	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		h.textError(w, "bad content-type: "+contentType, ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
+	if !h.IsApplicationJSONContentType(r) {
+		h.textError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// decode the request body
 	var payload []shortenBatchRequestPayload
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		h.textError(w, "failed to decode request", err, http.StatusInternalServerError)
+		h.textError(w, err.Error(), errs.ErrInvalidRequest, http.StatusInternalServerError)
 		return
 	}
-
-	h.logger.Debug("received batch request", zap.Int("count", len(payload)))
 
 	// prepare the records to save and send
 	recordsToSave := make([]*models.URL, len(payload))
 	result := make([]shortenBatchResponsePayload, len(payload))
+
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.shortenJSONError(w, "failed get user from context",
-			models.ErrInvalidDataType, http.StatusInternalServerError)
+		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
 	}
 
 	for i, p := range payload {
 
 		// check if URL is provided
 		if len(p.OriginalURL) == 0 {
-			h.textError(w, "url field is empty", ErrURLIsNotProvided, http.StatusBadRequest)
+			h.textError(w, "URL is not provided", errs.ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
 
 		// check if URL is a valid URL
 		if !govalidator.IsURL(p.OriginalURL) {
-			h.textError(w, "shorten url: "+p.OriginalURL, ErrNotValidURL, http.StatusBadRequest)
+			h.textError(w, "invalid URL", errs.ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
 
 		// generate short URL
 		shortURL, err := shorturl.Generate(p.OriginalURL)
 		if err != nil {
-			h.textError(w, "failed to shorten url: "+p.OriginalURL, err, http.StatusInternalServerError)
+			h.textError(w, "failed to shorten url", err, http.StatusInternalServerError)
 			return
 		}
 
 		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, user.ID)
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}
-
-	h.logger.Debug("saving batch of records", zap.Int("count", len(recordsToSave)))
 
 	// save the records
 	if err := h.store.SaveAll(r.Context(), recordsToSave); err != nil {

@@ -27,7 +27,10 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "positive test #1",
 			method:   http.MethodGet,
 			shortURL: "TZqSKV4t",
-			store:    initMockStore(&models.URL{OriginalURL: "https://e.mail.ru/inbox/"}),
+			store: initMockStore(&models.URL{
+				OriginalURL: "https://e.mail.ru/inbox/",
+				ShortURL:    "TZqSKV4t",
+			}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
@@ -38,7 +41,10 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "positive test #2",
 			method:   http.MethodGet,
 			shortURL: "YBbxJEcQ",
-			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
+			store: initMockStore(&models.URL{
+				OriginalURL: "https://go.dev/",
+				ShortURL:    "YBbxJEcQ",
+			}),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
@@ -101,7 +107,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid url: too long URL",
 			method:   http.MethodGet,
 			shortURL: "Too_Long_URL", // > 8 characters
-			store:    emptyMockStore,
+			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -113,7 +119,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid url: too short URL",
 			method:   http.MethodGet,
 			shortURL: "short", // < 8 characters
-			store:    emptyMockStore,
+			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -125,7 +131,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "invalid url: invalid base58 characters",
 			method:   http.MethodGet,
 			shortURL: "O0Il0O", // 0OIl+/ are not used
-			store:    emptyMockStore,
+			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -137,7 +143,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			name:     "no such URL",
 			method:   http.MethodGet,
 			shortURL: "2x1xx1x2",
-			store:    emptyMockStore,
+			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
 				defer res.Body.Close()
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -172,11 +178,11 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store, 5)
+			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			hctx.Redirect(w, r)
+			handler.Redirect(w, r)
 
 			// get recorded data
 			res := w.Result()

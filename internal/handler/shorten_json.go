@@ -33,7 +33,7 @@ type (
 // The message field should be set to an error message if the shortening failed.
 // Otherwise, success should be set to true and the result field should contain the shortened URL.
 //
-// Request:
+// Request
 //
 //	POST /api/shorten
 //	Content-Type: application/json
@@ -41,7 +41,7 @@ type (
 //	    "url": "https://example.com"
 //	}
 //
-// Response:
+// Response
 //
 //	HTTP/1.1 201 Created
 //	Content-Type: application/json
@@ -54,12 +54,12 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
-		h.textError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
+		h.shortenJSONError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// check content type
-	if h.IsApplicationJSONContentType(r) {
+	if !h.IsApplicationJSONContentType(r) {
 		h.shortenJSONError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
@@ -93,8 +93,8 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.shortenJSONError(w, "failed get user from context",
-			errs.ErrUnauthorized, http.StatusInternalServerError)
+		h.shortenJSONError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
+		return
 	}
 
 	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
@@ -153,7 +153,7 @@ func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err er
 	w.WriteHeader(code)
 	err = json.NewEncoder(w).Encode(shortenJSONResponsePayload{
 		Success: false,
-		Message: fmt.Sprintf("%s: %s", message, err),
+		Message: fmt.Sprintf("%s: %s", err, message),
 	})
 	if err != nil {
 		h.logger.Error("failed to encode response", zap.Error(err))

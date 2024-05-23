@@ -27,18 +27,9 @@ func TestPingDB(t *testing.T) {
 		want   want
 	}{
 		{
-			name:   "positive test #1",
+			name:   "connected test",
 			method: http.MethodGet,
-			store:  emptyMockStore,
-			want: want{
-				statusCode: http.StatusOK,
-				response:   "",
-			},
-		},
-		{
-			name:   "positive test #2",
-			method: http.MethodGet,
-			store:  emptyMockStore,
+			store:  &connectedStore{},
 			want: want{
 				statusCode: http.StatusOK,
 				response:   "",
@@ -47,7 +38,7 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "invalid method: method post",
 			method: http.MethodPost,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPost),
@@ -56,7 +47,7 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "invalid method: method put",
 			method: http.MethodPut,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
@@ -65,7 +56,7 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "invalid method: method patch",
 			method: http.MethodPatch,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
@@ -74,7 +65,7 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "invalid method: method delete",
 			method: http.MethodDelete,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
@@ -83,7 +74,7 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "DB not connected",
 			method: http.MethodGet,
-			store:  &notConnectedStore{},
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   fmt.Sprintf("%s: DB not connected", errs.ErrDBNotConnected),
@@ -108,11 +99,11 @@ func TestPingDB(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store, 5)
+			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			hctx.PingDB(w, r)
+			handler.PingDB(w, r)
 
 			// get recorded data
 			res := w.Result()

@@ -61,7 +61,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,
@@ -83,7 +83,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodGet,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodGet),
@@ -94,7 +94,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPut,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
@@ -105,7 +105,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPatch,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
@@ -116,7 +116,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodDelete,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
@@ -127,7 +127,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, textPlain),
@@ -138,7 +138,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     invalidJSON,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   errs.ErrInvalidRequest.Error(),
@@ -150,7 +150,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     "",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   errs.ErrInvalidRequest.Error(),
@@ -162,7 +162,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     emptyURL,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: URL is not provided", errs.ErrInvalidRequest),
@@ -173,7 +173,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     invalidURL,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest),
@@ -199,10 +199,10 @@ func TestShortenBatch(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			hctx, err := New(tt.store, 5)
+			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler error")
 
-			hctx.ShortenBatch(w, r)
+			handler.ShortenBatch(w, r)
 
 			res := w.Result()
 
@@ -221,4 +221,28 @@ func TestShortenBatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestShortenBatch_WithoutUserInContext(t *testing.T) {
+	path := "/api/shorten/batch"
+	payload := "https://go.dev/"
+
+	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
+	r.Header.Set(contentType, textPlain)
+
+	w := httptest.NewRecorder()
+
+	handler, err := New(db.NewInMemoryStore(), 5)
+	require.NoError(t, err, "new handler error")
+
+	handler.ShortenText(w, r)
+
+	res := w.Result()
+
+	response := getResponseTextPayload(t, res)
+	res.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
+	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
+		response, "response message mismatch")
 }

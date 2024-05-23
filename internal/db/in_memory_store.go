@@ -43,6 +43,11 @@ func (s *InMemoryStore) GetAllByUserID(_ context.Context, userID string) ([]*mod
 	}
 
 	s.mu.RUnlock()
+
+	if len(all) == 0 {
+		return nil, errs.ErrNotFound
+	}
+
 	return all, nil
 }
 

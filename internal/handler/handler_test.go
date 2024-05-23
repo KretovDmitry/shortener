@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,25 +20,12 @@ const (
 	applicationJSON = "application/json"
 )
 
-var (
-	errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
-	emptyMockStore                   = initMockStore(&models.URL{OriginalURL: ""})
-)
-
-var _ db.URLStorage = (*mockStore)(nil)
-
-type mockStore struct {
-	db.URLStorage
-}
-
-func initMockStore(u *models.URL) *mockStore {
-	inMem := db.NewInMemoryStore()
-	_ = inMem.Save(context.TODO(), u)
-	return &mockStore{inMem}
-}
+var errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
 
 // simulating errors with storage operations
 type brokenStore struct{}
+
+var _ db.URLStorage = (*brokenStore)(nil)
 
 func (s *brokenStore) Save(context.Context, *models.URL) error {
 	return errIntentionallyNotWorkingMethod
@@ -54,23 +40,29 @@ func (s *brokenStore) Get(context.Context, models.ShortURL) (*models.URL, error)
 }
 
 func (s *brokenStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
-	return nil, nil
+	return nil, errIntentionallyNotWorkingMethod
 }
 
 func (s *brokenStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
-	return nil
+	return errIntentionallyNotWorkingMethod
 }
 
 func (s *brokenStore) Ping(context.Context) error {
 	return errIntentionallyNotWorkingMethod
 }
 
-type notConnectedStore struct {
-	brokenStore
+type connectedStore struct {
+	*db.InMemoryStore
 }
 
-func (s *notConnectedStore) Ping(context.Context) error {
-	return errs.ErrDBNotConnected
+func (s *connectedStore) Ping(context.Context) error {
+	return nil
+}
+
+func initMockStore(u *models.URL) *db.InMemoryStore {
+	inMem := db.NewInMemoryStore()
+	_ = inMem.Save(context.TODO(), u)
+	return inMem
 }
 
 func TestNew(t *testing.T) {
@@ -86,10 +78,10 @@ func TestNew(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				store: emptyMockStore,
+				store: db.NewInMemoryStore(),
 			},
 			want: &Handler{
-				store: emptyMockStore,
+				store: db.NewInMemoryStore(),
 			},
 			wantErr: false,
 		},

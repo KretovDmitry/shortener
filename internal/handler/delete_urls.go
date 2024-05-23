@@ -39,7 +39,7 @@ func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	// Extract the user from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "failed to get user from context", errs.ErrUnauthorized, http.StatusInternalServerError)
+		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
 		return
 	}
 

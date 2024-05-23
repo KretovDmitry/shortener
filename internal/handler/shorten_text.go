@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
@@ -67,6 +66,7 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	user, ok := user.FromContext(r.Context())
 	if !ok {
 		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
+		return
 	}
 
 	// Create a new record with the generated short URL, original URL, and user ID.
@@ -110,13 +110,4 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-}
-
-// isTextPlainContentType returns true if the content type is text/plain.
-func isTextPlainContentType(contentType string) bool {
-	contentType = strings.ToLower(strings.TrimSpace(contentType))
-	if i := strings.Index(contentType, ";"); i > -1 {
-		contentType = contentType[0:i]
-	}
-	return contentType == "text/plain"
 }

@@ -6,9 +6,15 @@ import (
 	"net/http"
 
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"go.uber.org/zap"
 )
+
+type getAllByUserIDResponsePayload struct {
+	ShortURL    models.ShortURL    `json:"short_url"`
+	OriginalURL models.OriginalURL `json:"original_url"`
+}
 
 // GetAllByUserID returns all URLs for a given user ID.
 //
@@ -31,7 +37,6 @@ import (
 //
 // ]
 func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
-	defer h.logger.Sync()
 	defer r.Body.Close()
 
 	// check request method
@@ -44,28 +49,32 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		h.textError(w, "failed get user from context", errs.ErrUnauthorized, http.StatusInternalServerError)
+		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
+		return
 	}
 
 	URLs, err := h.store.GetAllByUserID(r.Context(), user.ID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			w.WriteHeader(http.StatusNoContent)
-			h.logger.Info("No URLs found for user", zap.String("userID", user.ID))
+			h.textError(w, "nothing found", err, http.StatusNoContent)
 			return
 		}
 		h.textError(w, "failed to get URLs", err, http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Debug("URLs", zap.Any("URLs", URLs))
+	response := make([]getAllByUserIDResponsePayload, len(URLs))
+	for i, u := range URLs {
+		response[i].ShortURL = u.ShortURL
+		response[i].OriginalURL = u.OriginalURL
+	}
 
 	// set the response header content type
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
 	// encode response body
-	if err := json.NewEncoder(w).Encode(URLs); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.logger.Error("failed to encode response", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

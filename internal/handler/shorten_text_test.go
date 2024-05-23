@@ -36,7 +36,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     "https://e.mail.ru/inbox/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "TZqSKV4t",
@@ -47,7 +47,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "YBbxJEcQ",
@@ -60,6 +60,7 @@ func TestShortenText(t *testing.T) {
 			payload:     "https://go.dev/",
 			store: initMockStore(&models.URL{
 				OriginalURL: "https://go.dev/",
+				ShortURL:    "YBbxJEcQ",
 			}),
 			want: want{
 				statusCode: http.StatusConflict,
@@ -71,7 +72,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodGet,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodGet),
@@ -82,7 +83,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPut,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
@@ -93,7 +94,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPatch,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
@@ -104,7 +105,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodDelete,
 			contentType: textPlain,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
@@ -115,7 +116,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, applicationJSON),
@@ -126,7 +127,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: "text/plain; charset=utf-16",
 			payload:     "https://go.dev/",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "YBbxJEcQ",
@@ -137,7 +138,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     "",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: URL is not provided", errs.ErrInvalidRequest),
@@ -148,7 +149,7 @@ func TestShortenText(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     "https://test...com",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest),
@@ -174,10 +175,10 @@ func TestShortenText(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			hctx, err := New(tt.store, 5)
+			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
-			hctx.ShortenText(w, r)
+			handler.ShortenText(w, r)
 
 			res := w.Result()
 
@@ -194,4 +195,28 @@ func TestShortenText(t *testing.T) {
 			assert.Equal(t, tt.want.response, response)
 		})
 	}
+}
+
+func TestShortenText_WithoutUserInContext(t *testing.T) {
+	path := "/"
+	payload := "https://go.dev/"
+
+	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
+	r.Header.Set(contentType, textPlain)
+
+	w := httptest.NewRecorder()
+
+	handler, err := New(db.NewInMemoryStore(), 5)
+	require.NoError(t, err, "new handler error")
+
+	handler.ShortenText(w, r)
+
+	res := w.Result()
+
+	response := getResponseTextPayload(t, res)
+	res.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
+	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
+		response, "response message mismatch")
 }

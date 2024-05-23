@@ -90,6 +90,7 @@ func (h *Handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	user, ok := user.FromContext(r.Context())
 	if !ok {
 		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
+		return
 	}
 
 	for i, p := range payload {

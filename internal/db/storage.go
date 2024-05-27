@@ -30,7 +30,7 @@ func NewStore(ctx context.Context) (URLStorage, error) {
 	}
 
 	// create a new file storage combined with in memory storage
-	store, err := NewFileStore(config.FileStorage.Path())
+	store, err := NewFileStore(config.FS.Path())
 	if err != nil {
 		return nil, fmt.Errorf("new file store: %w", err)
 	}

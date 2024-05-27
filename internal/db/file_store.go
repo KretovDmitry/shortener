@@ -91,7 +91,7 @@ func NewFileStore(filepath string) (*fileStore, error) {
 		}
 	}
 
-	if !config.FileStorage.WriteRequired() {
+	if !config.FS.WriteRequired() {
 		return fileStore, nil
 	}
 
@@ -130,7 +130,7 @@ func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 	}
 
 	// write the record to the file if required
-	if config.FileStorage.WriteRequired() {
+	if config.FS.WriteRequired() {
 		if err := fs.file.WriteRecord(url); err != nil {
 			return fmt.Errorf("write record: %w", err)
 		}
@@ -155,7 +155,7 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 		}
 
 		// write the record to the file if required
-		if config.FileStorage.WriteRequired() {
+		if config.FS.WriteRequired() {
 			if err = fs.file.WriteRecord(url); err != nil {
 				return fmt.Errorf("write file record: %w", err)
 			}

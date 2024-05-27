@@ -1,3 +1,4 @@
+// Package config provides configuration related utilities.
 package config
 
 import (
@@ -11,30 +12,43 @@ import (
 	"time"
 )
 
+// Default values for config.
 const (
 	defaultHost     = "0.0.0.0"
 	defaultPort     = 8080
 	defaultFileName = "short-url-db.json"
 )
 
-type netAddress struct {
+// Flag Value interface implementation guards.
+var (
+	_ flag.Value = (*NetAddress)(nil)
+	_ flag.Value = (*FileStorage)(nil)
+	_ flag.Value = (*Duration)(nil)
+)
+
+// NetAddress represents a network address with a host and a port.
+type NetAddress struct {
 	Host string
 	Port int
 }
 
-// NewNetAddress returns pointer to a new netAddress with default Host and Port
-func NewNetAddress() *netAddress {
-	return &netAddress{
+// NewNetAddress returns a pointer to a new NetAddress with default Host and Port.
+func NewNetAddress() *NetAddress {
+	return &NetAddress{
 		Host: defaultHost,
 		Port: defaultPort,
 	}
 }
 
-func (a netAddress) String() string {
+// String returns a string representation of the NetAddress in the form "host:port".
+func (a *NetAddress) String() string {
 	return fmt.Sprintf("%s:%d", a.Host, a.Port)
 }
 
-func (a *netAddress) Set(s string) error {
+// Set sets the host and port of the NetAddress from a string in the form "host:port".
+//
+// It returns an error if the input string is not in the correct format.
+func (a *NetAddress) Set(s string) error {
 	s = strings.TrimPrefix(s, "http://")
 
 	hp := strings.Split(s, ":")
@@ -51,29 +65,38 @@ func (a *netAddress) Set(s string) error {
 	if hp[0] != "" {
 		a.Host = hp[0]
 	}
+
 	a.Port = port
 
 	return nil
 }
 
-type fileStorage struct {
+// FileStorage represents a file storage configuration
+// with a path and a write requirement flag.
+type FileStorage struct {
 	path          string
 	writeRequired bool
 }
 
-func NewFileStorage() *fileStorage {
+// NewFileStorage returns a pointer to a new fileStorage configuration
+// with default path and write requirement.
+func NewFileStorage() *FileStorage {
 	tmp := os.TempDir()
-	return &fileStorage{
+	return &FileStorage{
 		path:          path.Join(tmp, defaultFileName),
 		writeRequired: true,
 	}
 }
 
-func (fs *fileStorage) String() string {
+// String returns a string representation of the fileStorage path.
+func (fs *FileStorage) String() string {
 	return fs.path
 }
 
-func (fs *fileStorage) Set(s string) error {
+// Set sets the file storage path from a string.
+//
+// If provided string is empty there will be no file writing.
+func (fs *FileStorage) Set(s string) error {
 	if s == "" {
 		fs.writeRequired = false
 		return nil
@@ -84,53 +107,63 @@ func (fs *fileStorage) Set(s string) error {
 	return nil
 }
 
-func (fs *fileStorage) Path() string {
+// Path returns the file storage path.
+func (fs *FileStorage) Path() string {
 	return fs.path
 }
 
-func (fs *fileStorage) WriteRequired() bool {
+// WriteRequired returns whether the file storage requires writing.
+func (fs *FileStorage) WriteRequired() bool {
 	return fs.writeRequired
 }
 
-type duration time.Duration
+// Duration represents a duration in time.Duration format.
+// Defaults to time.Duration zero value.
+type Duration time.Duration
 
-func (d *duration) String() string {
+// String returns a string representation of the Duration in the form of time.Duration.
+func (d *Duration) String() string {
 	return time.Duration(*d).String()
 }
 
-func (d *duration) Set(s string) error {
+// Set sets the duration from a string in the form of time.Duration.
+//
+// It returns an error if the input string is not in the correct format.
+func (d *Duration) Set(s string) error {
 	dd, err := time.ParseDuration(s)
 	if err != nil {
 		return err
 	}
 
-	*d = duration(dd)
+	*d = Duration(dd)
 
 	return nil
 }
 
+// Global singleton configuration variables.
 var (
 	AddrToRun       = NewNetAddress()
 	AddrToReturn    = NewNetAddress()
-	FileStorage     = NewFileStorage()
+	FS              = NewFileStorage()
 	DSN             string
 	LogLevel        string
 	Secret          string
-	JWT             = duration(time.Hour * 3)
+	JWT             = Duration(time.Hour * 3)
 	MigrationDir    string
 	ShutdownTimeout = 30 * time.Second
 )
 
+// ParseFlags parses the command line flags and sets the corresponding values.
+// It also reads the environment variables and sets the values if they are present.
+//
+// Flags take precedence over the default values.
+// Environment variables have the highest priority.
 func ParseFlags() error {
-	var (
-		_ flag.Value = (*netAddress)(nil)
-		_ flag.Value = (*fileStorage)(nil)
-		_ flag.Value = (*duration)(nil)
-	)
+
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")
-	flag.Var(FileStorage, "f", "File storage path")
+	flag.Var(FS, "f", "File storage path")
 	flag.Var(&JWT, "j", `JWT lifetime in form of time.Duration: such as "2h45m"`)
 	flag.StringVar(&DSN, "d", "", "Data source name in form postgres URL or DSN string")
 	flag.StringVar(&LogLevel, "l", "info", "Log level")
@@ -152,7 +185,7 @@ func ParseFlags() error {
 	}
 
 	if envFileStoragePath, set := os.LookupEnv("FILE_STORAGE_PATH"); set {
-		if err := FileStorage.Set(envFileStoragePath); err != nil {
+		if err := FS.Set(envFileStoragePath); err != nil {
 			return fmt.Errorf("invalid FILE_STORAGE_PATH: %w", err)
 		}
 	}

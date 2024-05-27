@@ -26,41 +26,40 @@ type (
 
 // ShortenBatch handles requests to shorten multiple URLs in a single request.
 //
-// Request
+// Request:
 //
 //	POST /api/shorten/batch
 //	Content-Type: application/json
 //
-// [
-//
-//	{
-//		"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//		"original_url": "http://..."
-//	},
-//	{
-//		"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//		"original_url": "http://..."
-//	}
-//
-// ]
+//	 [
+//		{
+//			"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
+//			"original_url": "http://..."
+//		},
+//		{
+//			"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
+//			"original_url": "http://..."
+//		},
+//		...
+//	 ]
 //
 // Response:
 //
 //	HTTP/1.1 201 Created
 //	Content-Type: application/json
 //
-// [
+//	[
 //
-//	{
-//		"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//		"short_url": "http://config.AddrToReturn/Base58{8}"
-//	},
-//	{
-//		"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//		"short_url": "http://config.AddrToReturn/Base58{8}"
-//	},
-//
-// ]
+//		{
+//			"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
+//			"short_url": "http://config.AddrToReturn/Base58{8}"
+//		},
+//		{
+//			"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
+//			"short_url": "http://config.AddrToReturn/Base58{8}"
+//		},
+//		...
+//	 ]
 func (h *Handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	// check the request method
 	if r.Method != http.MethodPost {

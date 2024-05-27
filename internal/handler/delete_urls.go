@@ -12,14 +12,13 @@ import (
 
 // DeleteByUserID deletes a list of shortened URLs owned by a specific user.
 //
+// Request:
+//
 //	DELETE /api/user/urls
 //
-//	{
-//		 urls:
-//			[
-//				"6qxTVvsy", "RTfd56hn", "Jlfd67ds",
-//			]
-//	}
+//	{ urls: [ "6qxTVvsy", "RTfd56hn", "Jlfd67ds", ... ] }
+//
+// Response:
 //
 //	HTTP/1.1 202 Accepted
 func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {

@@ -29,8 +29,7 @@ type Handler struct {
 	bufLen         int
 }
 
-// New constructs a new handler,
-// ensuring that the dependencies are valid values
+// New constructs a new handler, ensuring that the dependencies are valid values.
 func New(store db.URLStorage, bufLen int) (*Handler, error) {
 	if store == nil {
 		return nil, errors.New("nil store")

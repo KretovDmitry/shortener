@@ -11,6 +11,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/stretchr/testify v1.8.4
+	go.uber.org/mock v0.4.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 

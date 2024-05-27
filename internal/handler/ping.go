@@ -9,7 +9,9 @@ import (
 
 // PingDB checks the status of the database connection.
 //
-// Method: GET
+// Request:
+//
+//	GET /ping
 func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodGet {

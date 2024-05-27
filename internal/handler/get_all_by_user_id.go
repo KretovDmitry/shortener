@@ -16,7 +16,7 @@ type getAllByUserIDResponsePayload struct {
 	OriginalURL models.OriginalURL `json:"original_url"`
 }
 
-// GetAllByUserID returns all URLs for a given user ID.
+// GetAllByUserID returns shortened and original URLs for a given user ID.
 //
 // Request:
 //
@@ -27,15 +27,13 @@ type getAllByUserIDResponsePayload struct {
 //	HTTP/1.1 200 OK
 //	Content-Type: application/json
 //
-// [
-//
-//	{
-//	    "short_url": "http://config.AddrToReturn/Base58{8}",
-//	    "original_url": "http://..."
-//	},
-//	...
-//
-// ]
+//	[
+//		{
+//		    "short_url": "http://config.AddrToReturn/Base58{8}",
+//		    "original_url": "http://..."
+//		},
+//		...
+//	]
 func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 

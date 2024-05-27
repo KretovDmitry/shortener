@@ -33,20 +33,18 @@ type (
 // The message field should be set to an error message if the shortening failed.
 // Otherwise, success should be set to true and the result field should contain the shortened URL.
 //
-// Request
+// Request:
 //
 //	POST /api/shorten
 //	Content-Type: application/json
-//	{
-//	    "url": "https://example.com"
-//	}
+//	{ "url": "https://example.com" }
 //
-// Response
+// Response:
 //
 //	HTTP/1.1 201 Created
 //	Content-Type: application/json
 //	{
-//	    "result": "http://config.AddrToReturn/Base58{8}"
+//		"result": "http://config.AddrToReturn/Base58{8}"
 //		"success": true
 //		"message": "OK"
 //	}

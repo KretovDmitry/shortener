@@ -1,3 +1,4 @@
+// Package logger provides a logger using the zap library.
 package logger
 
 import (
@@ -14,8 +15,13 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+// loggerCtxKey is a type used to store the logger in the context.
 type loggerCtxKey struct{}
 
+// Get returns the default zap logger.
+// It initializes the logger with the specified log level from the config package.
+// If the log level is invalid, it defaults to INFO.
+// The logger logs to both the console and a file named "logs/app.log".
 func Get() *zap.Logger {
 	sync.OnceFunc(func() {
 		stdout := zapcore.AddSync(os.Stdout)

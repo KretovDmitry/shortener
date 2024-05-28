@@ -1,7 +1,9 @@
+// Package user provides functions to manage user data in the context.
 package user
 
 import "context"
 
+// User struct represents a user.
 type User struct {
 	ID string
 }

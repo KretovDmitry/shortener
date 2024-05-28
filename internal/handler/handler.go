@@ -20,13 +20,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handler struct represents the main handler for the application.
 type Handler struct {
-	store          db.URLStorage
-	logger         *zap.Logger
+	// store is the database URL storage.
+	store db.URLStorage
+	// logger is the application logger.
+	logger *zap.Logger
+	// deleteURLsChan is a channel for sending deleted URLs to be flushed from the database.
 	deleteURLsChan chan *models.URL
-	wg             *sync.WaitGroup
-	done           chan struct{}
-	bufLen         int
+	// wg is a wait group used to manage the goroutine that flushes deleted URLs.
+	wg *sync.WaitGroup
+	// done is a channel used to signal the stop of the handler.
+	done chan struct{}
+	// bufLen is the buffer length for storing deleted URLs before flushing them to the database.
+	bufLen int
 }
 
 // New constructs a new handler, ensuring that the dependencies are valid values.
@@ -53,6 +60,10 @@ func New(store db.URLStorage, bufLen int) (*Handler, error) {
 	return h, nil
 }
 
+// Stop stops the handler and waits for all goroutines to finish.
+// It sends a close signal to the done channel and then waits for the
+// WaitGroup to finish. If the shutdown timeout is exceeded, it logs an error.
+// It is safe for concurrent use.
 func (h *Handler) Stop() {
 	sync.OnceFunc(func() {
 		close(h.done)
@@ -96,6 +107,11 @@ func (h *Handler) Register(r chi.Router) chi.Router {
 	return r
 }
 
+// flushDeletedURLs is a goroutine that periodically flushes the deleted URLs
+// from the buffer to the database. It uses a ticker to trigger the flush
+// operation every 10 seconds. If the channel for sending deleted URLs is closed,
+// the goroutine stops.
+// It is safe for concurrent use.
 func (h *Handler) flushDeletedURLs() {
 	ticker := time.NewTicker(10 * time.Second)
 	URLs := make([]*models.URL, 0, h.bufLen)
@@ -125,12 +141,13 @@ func (h *Handler) flushDeletedURLs() {
 	}
 }
 
+// flush deletes the given URLs from the database.
+// If an error occurs during the deletion process, it logs an error message
+// with the error details. It returns the error encountered during the deletion process.
 func (h *Handler) flush(URLs ...*models.URL) error {
 	if len(URLs) == 0 {
 		return nil
 	}
-
-	h.logger.Info("deleting", zap.Int("num", len(URLs)))
 
 	err := h.store.DeleteURLs(context.TODO(), URLs...)
 	if err != nil {

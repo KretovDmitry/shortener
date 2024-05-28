@@ -18,6 +18,9 @@ type compressReader struct {
 	zr *gzip.Reader
 }
 
+// NewCompressReader creates a new compressReader instance.
+// It takes an io.ReadCloser and returns a new compressReader
+// with a new gzip.Reader.
 func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
@@ -30,10 +33,14 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
+// Read reads data from the underlying gzip.Reader and writes it to the provided byte slice.
+// It returns the number of bytes read and any error that occurs during the read operation.
 func (c compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
+// Close closes the underlying gzip.Reader and io.ReadCloser.
+// It returns any error that occurs during the close operation.
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return fmt.Errorf("close failed: %w", err)

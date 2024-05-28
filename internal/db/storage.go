@@ -8,6 +8,7 @@ import (
 	"github.com/KretovDmitry/shortener/internal/models"
 )
 
+// Interface of the URL storage.
 type URLStorage interface {
 	Save(context.Context, *models.URL) error
 	SaveAll(context.Context, []*models.URL) error
@@ -17,7 +18,7 @@ type URLStorage interface {
 	Ping(context.Context) error
 }
 
-// NewStore creates a new instance of URLStorage based on the configuration
+// NewStore creates a new instance of URLStorage based on the configuration.
 func NewStore(ctx context.Context) (URLStorage, error) {
 	if config.DSN != "" {
 		// create a new postgres store

@@ -1,3 +1,4 @@
+// Package logger provides a logger using the zap library.
 package logger
 
 import (
@@ -14,12 +15,15 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+// loggerCtxKey is a type used to store the logger in the context.
 type loggerCtxKey struct{}
 
-var once sync.Once
-
+// Get returns the default zap logger.
+// It initializes the logger with the specified log level from the config package.
+// If the log level is invalid, it defaults to INFO.
+// The logger logs to both the console and a file named "logs/app.log".
 func Get() *zap.Logger {
-	once.Do(func() {
+	sync.OnceFunc(func() {
 		stdout := zapcore.AddSync(os.Stdout)
 
 		file := zapcore.AddSync(&lumberjack.Logger{
@@ -30,7 +34,6 @@ func Get() *zap.Logger {
 			Compress:   true,
 		})
 
-		level := zap.InfoLevel
 		levelFromEnv, err := zapcore.ParseLevel(config.LogLevel)
 		if err != nil {
 			log.Println(
@@ -38,9 +41,7 @@ func Get() *zap.Logger {
 			)
 		}
 
-		level = levelFromEnv
-
-		logLevel := zap.NewAtomicLevelAt(level)
+		logLevel := zap.NewAtomicLevelAt(levelFromEnv)
 
 		productionCfg := zap.NewProductionEncoderConfig()
 		productionCfg.TimeKey = "timestamp"
@@ -77,7 +78,7 @@ func Get() *zap.Logger {
 		)
 
 		zap.ReplaceGlobals(zap.New(core))
-	})
+	})()
 
 	return zap.L()
 }
@@ -96,7 +97,7 @@ func FromCtx(ctx context.Context) *zap.Logger {
 func WithCtx(ctx context.Context, l *zap.Logger) context.Context {
 	if lp, ok := ctx.Value(loggerCtxKey{}).(*zap.Logger); ok {
 		if lp == l {
-			// Do not store same logger.
+			// Do not store the same logger.
 			return ctx
 		}
 	}

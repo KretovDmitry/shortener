@@ -10,25 +10,31 @@ import (
 	"go.uber.org/zap"
 )
 
-type (
-	loggingResponseWriter struct {
-		http.ResponseWriter
-		status      int
-		size        int
-		wroteHeader bool
-	}
-)
+// loggingResponseWriter is a wrapper around http.ResponseWriter
+// that adds logging capabilities.
+// It tracks the HTTP status code, the size of the response body,
+// and whether the header has been written.
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status      int
+	size        int
+	wroteHeader bool
+}
 
+// newLoggingResponseWriter creates a new instance of loggingResponseWriter.
+// It wraps the provided http.ResponseWriter and adds logging capabilities.
 func newLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
 	return &loggingResponseWriter{ResponseWriter: w}
 }
 
+// Write writes the given bytes to the response writer.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := r.ResponseWriter.Write(b)
 	r.size += size
 	return size, err
 }
 
+// WriteHeader sets the HTTP status code.
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	if r.wroteHeader {
 		return

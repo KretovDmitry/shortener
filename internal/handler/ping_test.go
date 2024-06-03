@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
-	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,18 +27,9 @@ func TestPingDB(t *testing.T) {
 		want   want
 	}{
 		{
-			name:   "positive test #1",
+			name:   "connected test",
 			method: http.MethodGet,
-			store:  emptyMockStore,
-			want: want{
-				statusCode: http.StatusOK,
-				response:   "",
-			},
-		},
-		{
-			name:   "positive test #2",
-			method: http.MethodGet,
-			store:  emptyMockStore,
+			store:  &connectedStore{},
 			want: want{
 				statusCode: http.StatusOK,
 				response:   "",
@@ -47,46 +38,46 @@ func TestPingDB(t *testing.T) {
 		{
 			name:   "invalid method: method post",
 			method: http.MethodPost,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPost, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPost),
 			},
 		},
 		{
 			name:   "invalid method: method put",
 			method: http.MethodPut,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
 			},
 		},
 		{
 			name:   "invalid method: method patch",
 			method: http.MethodPatch,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
 			},
 		},
 		{
 			name:   "invalid method: method delete",
 			method: http.MethodDelete,
-			store:  emptyMockStore,
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyGETMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
 			},
 		},
 		{
 			name:   "DB not connected",
 			method: http.MethodGet,
-			store:  &notConnectedStore{},
+			store:  db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("DB not connected: %s", models.ErrDBNotConnected),
+				response:   fmt.Sprintf("%s: DB not connected", errs.ErrDBNotConnected),
 			},
 		},
 		{
@@ -95,7 +86,7 @@ func TestPingDB(t *testing.T) {
 			store:  &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("connection error: %s", errIntentionallyNotWorkingMethod),
+				response:   fmt.Sprintf("%s: connection error", errIntentionallyNotWorkingMethod),
 			},
 		},
 	}
@@ -108,11 +99,11 @@ func TestPingDB(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			hctx, err := New(tt.store, 5)
+			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			hctx.PingDB(w, r)
+			handler.PingDB(w, r)
 
 			// get recorded data
 			res := w.Result()

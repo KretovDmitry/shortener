@@ -21,50 +21,16 @@ const (
 )
 
 var errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
-var emptyMockStore = &mockStore{expectedData: ""}
-
-// mokeStore must implement URLStore interface
-type mockStore struct {
-	expectedData string
-}
-
-// do nothing on create, return ErrConflict if URL already exists
-func (s *mockStore) Save(ctx context.Context, url *models.URL) error {
-	if s.expectedData == string(url.OriginalURL) {
-		return models.ErrConflict
-	}
-	return nil
-}
-
-func (s *mockStore) SaveAll(context.Context, []*models.URL) error {
-	return nil
-}
-
-// return expected data
-func (s *mockStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
-	// mock not found error
-	if s.expectedData == "" {
-		return nil, models.ErrNotFound
-	}
-	return &models.URL{OriginalURL: models.OriginalURL(s.expectedData)}, nil
-}
-func (s *mockStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
-	return nil, nil
-}
-
-func (s *mockStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
-	return nil
-}
-func (s *mockStore) Ping(context.Context) error {
-	return nil
-}
 
 // simulating errors with storage operations
 type brokenStore struct{}
 
+var _ db.URLStorage = (*brokenStore)(nil)
+
 func (s *brokenStore) Save(context.Context, *models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
+
 func (s *brokenStore) SaveAll(context.Context, []*models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
@@ -72,28 +38,34 @@ func (s *brokenStore) SaveAll(context.Context, []*models.URL) error {
 func (s *brokenStore) Get(context.Context, models.ShortURL) (*models.URL, error) {
 	return nil, errIntentionallyNotWorkingMethod
 }
+
 func (s *brokenStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
-	return nil, nil
+	return nil, errIntentionallyNotWorkingMethod
 }
+
 func (s *brokenStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
-	return nil
+	return errIntentionallyNotWorkingMethod
 }
 
 func (s *brokenStore) Ping(context.Context) error {
 	return errIntentionallyNotWorkingMethod
 }
 
-type notConnectedStore struct {
-	brokenStore
+type connectedStore struct {
+	*db.InMemoryStore
 }
 
-func (s *notConnectedStore) Ping(context.Context) error {
-	return models.ErrDBNotConnected
+func (s *connectedStore) Ping(context.Context) error {
+	return nil
+}
+
+func initMockStore(u *models.URL) *db.InMemoryStore {
+	inMem := db.NewInMemoryStore()
+	_ = inMem.Save(context.TODO(), u)
+	return inMem
 }
 
 func TestNew(t *testing.T) {
-	emptyMockStore := &mockStore{expectedData: ""}
-
 	type args struct {
 		store db.URLStorage
 	}
@@ -106,10 +78,10 @@ func TestNew(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				store: emptyMockStore,
+				store: db.NewInMemoryStore(),
 			},
 			want: &Handler{
-				store: emptyMockStore,
+				store: db.NewInMemoryStore(),
 			},
 			wantErr: false,
 		},

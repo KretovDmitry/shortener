@@ -3,8 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"go.uber.org/zap"
@@ -12,40 +12,33 @@ import (
 
 // DeleteByUserID deletes a list of shortened URLs owned by a specific user.
 //
+// Request:
+//
 //	DELETE /api/user/urls
 //
-//	{
-//		 urls:
-//			[
-//				"6qxTVvsy", "RTfd56hn", "Jlfd67ds",
-//			]
-//	}
+//	{ urls: [ "6qxTVvsy", "RTfd56hn", "Jlfd67ds", ... ] }
+//
+// Response:
 //
 //	HTTP/1.1 202 Accepted
 func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 	// Check the request method.
 	if r.Method != http.MethodDelete {
 		// Return a "Bad Request" error if the request method is not "DELETE".
-		h.textError(w, "bad method: "+r.Method,
-			ErrOnlyDeleteMethodIsAllowed, http.StatusBadRequest)
+		h.textError(w, r.Method, errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// Check content type.
-	contentType := r.Header.Get("Content-Type")
-	if strings.ToLower(strings.TrimSpace(contentType)) != "application/json" {
-		h.shortenJSONError(w, "bad content-type: "+contentType,
-			ErrOnlyApplicationJSONContentType, http.StatusBadRequest)
+	if !h.IsApplicationJSONContentType(r) {
+		h.textError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
 	// Extract the user from the request context.
 	user, ok := user.FromContext(r.Context())
 	if !ok {
-		// Return an internal server error
-		// if the user cannot be retrieved from the context.
-		h.textError(w, "failed to get user from context",
-			models.ErrInvalidDataType, http.StatusInternalServerError)
+		h.textError(w, "no user found", errs.ErrUnauthorized, http.StatusUnauthorized)
 		return
 	}
 

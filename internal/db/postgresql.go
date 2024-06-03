@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -53,7 +54,7 @@ func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
 		if errors.As(err, &pgErr) {
 			// return ErrConflict if the record already exists
 			if pgErr.Code == pgerrcode.UniqueViolation {
-				return models.ErrConflict
+				return errs.ErrConflict
 			}
 			// create a new error with additional context
 			return fmt.Errorf("save url with query (%s): %w",
@@ -69,7 +70,6 @@ func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
 
 // SaveAll saves multiple URL records to the database in a single transaction.
 // If a URL record already exists, the record is not inserted.
-// If the transaction fails, all changes are rolled back.
 func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 	const q = `
         INSERT INTO url 
@@ -133,7 +133,7 @@ func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, models.ErrNotFound
+			return nil, errs.ErrNotFound
 		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -149,20 +149,25 @@ func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models
 	return u, nil
 }
 
+// GetAllByUserID retrieves all URL records from the database associated with a specific user.
+// It returns a slice of URL pointers and an error if any occurred.
+// If no URL records are found for the given user, it returns nil and ErrNotFound.
 func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
 	const q = `
-		SELECT
-			short_url, original_url
-		FROM
-			url
-		WHERE
-			user_id = $1
-	`
+        SELECT
+            short_url, original_url
+        FROM
+            url
+        WHERE
+            user_id = $1
+    `
+
+	// Execute the query with the given userID.
 	rows, err := pg.store.QueryContext(ctx, q, userID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			// Create a new error with additional context.
+			// If the error is a PgError, create a new error with additional context.
 			return nil, fmt.Errorf("retrieve url with query (%s): %w",
 				formatQuery(q), formatPgError(pgErr),
 			)
@@ -170,33 +175,42 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 
 		return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
 	}
+	defer rows.Close() // Close the rows when the function returns.
 
-	all := make([]*models.URL, 0)
+	all := make([]*models.URL, 0) // Initialize an empty slice to store the URL pointers.
 	for rows.Next() {
-		u := new(models.URL)
+		u := new(models.URL) // Create a new URL pointer.
+
+		// Scan the current row into the URL pointer.
 		err = rows.Scan(&u.ShortURL, &u.OriginalURL)
 		if err != nil {
-			return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
+			return nil, fmt.Errorf(
+				"retrieve url with query (%s): %w", formatQuery(q), err,
+			)
 		}
+
+		// Append the URL pointer to the slice.
 		all = append(all, u)
 	}
 
-	if err = rows.Close(); err != nil {
-		return nil, fmt.Errorf("close rows with query (%s): %w", formatQuery(q), err)
-	}
-
-	// Rows.Err will report the last error encountered by Rows.Scan.
+	// Check if there was an error during iteration over the rows.
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
 	}
 
+	// If the slice is empty, return nil and ErrNotFound.
 	if len(all) == 0 {
-		return nil, models.ErrNotFound
+		return nil, errs.ErrNotFound
 	}
 
+	// Return the slice of URL pointers and nil error.
 	return all, nil
 }
 
+// DeleteURLs deletes the specified URLs from the database.
+// It takes a context and a slice of URL pointers as parameters.
+// It returns an error if any occurs during the deletion process.
+// If no URLs are provided, it returns nil.
 func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
 	if len(urls) == 0 {
 		return nil

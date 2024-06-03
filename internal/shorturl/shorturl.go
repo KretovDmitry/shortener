@@ -2,8 +2,8 @@ package shorturl
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
-	"math/big"
 
 	"github.com/itchyny/base58-go"
 )
@@ -29,7 +29,7 @@ func base58Encoded(bytes []byte) (string, error) {
 // Generate produces a short link with a length of 8 characters from the original one
 func Generate(initialLink string) (string, error) {
 	urlHashBytes := sha256Of([]byte(initialLink))
-	generatedNumber := new(big.Int).SetBytes(urlHashBytes).Uint64()
+	generatedNumber := binary.BigEndian.Uint64(urlHashBytes)
 	finalString, err := base58Encoded([]byte(fmt.Sprintf("%d", generatedNumber)))
 	if err != nil {
 		return "", fmt.Errorf("failed to generate short link: %w", err)

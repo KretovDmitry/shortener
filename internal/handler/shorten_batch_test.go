@@ -9,6 +9,8 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +24,7 @@ func TestShortenBatch(t *testing.T) {
 		{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":"https://e.mail.ru/inbox/"}
 	]`
 
-	happyResponse := fmt.Sprintf(`[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/eDKZ8wBC"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://%[1]s/be8xnp4H"}]`,
+	happyResponse := fmt.Sprintf(`[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/YBbxJEcQ"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://%[1]s/TZqSKV4t"}]`,
 		config.AddrToReturn)
 
 	const invalidJSON = `
@@ -59,7 +61,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,
@@ -70,7 +72,7 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       &mockStore{expectedData: "https://go.dev/"},
+			store:       initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,
@@ -81,10 +83,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodGet,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodGet, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodGet),
 			},
 		},
 		{
@@ -92,10 +94,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPut,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPut, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
 			},
 		},
 		{
@@ -103,10 +105,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPatch,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodPatch, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
 			},
 		},
 		{
@@ -114,10 +116,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodDelete,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad method: %s: %s", http.MethodDelete, ErrOnlyPOSTMethodIsAllowed),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
 			},
 		},
 		{
@@ -125,10 +127,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     goodPayload,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("bad content-type: %s: %s", textPlain, ErrOnlyApplicationJSONContentType),
+				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, textPlain),
 			},
 		},
 		{
@@ -136,10 +138,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     invalidJSON,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   "failed to decode request",
+				response:   errs.ErrInvalidRequest.Error(),
 			},
 			wantErr: true,
 		},
@@ -148,10 +150,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     "",
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   "failed to decode request",
+				response:   errs.ErrInvalidRequest.Error(),
 			},
 			wantErr: true,
 		},
@@ -160,10 +162,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     emptyURL,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("url field is empty: %s", ErrURLIsNotProvided),
+				response:   fmt.Sprintf("%s: URL is not provided", errs.ErrInvalidRequest),
 			},
 		},
 		{
@@ -171,10 +173,10 @@ func TestShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     invalidURL,
-			store:       emptyMockStore,
+			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("shorten url: https://test...com: %s", ErrNotValidURL),
+				response:   fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest),
 			},
 		},
 		{
@@ -185,7 +187,7 @@ func TestShortenBatch(t *testing.T) {
 			store:       &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("failed to save to database: %s", errIntentionallyNotWorkingMethod),
+				response:   fmt.Sprintf("%s: failed to save to database", errIntentionallyNotWorkingMethod),
 			},
 		},
 	}
@@ -197,10 +199,10 @@ func TestShortenBatch(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			hctx, err := New(tt.store, 5)
-			require.NoError(t, err, "new handler context error")
+			handler, err := New(tt.store, 5)
+			require.NoError(t, err, "new handler error")
 
-			hctx.ShortenBatch(w, r)
+			handler.ShortenBatch(w, r)
 
 			res := w.Result()
 
@@ -217,7 +219,30 @@ func TestShortenBatch(t *testing.T) {
 			case !tt.wantErr:
 				assert.Equal(t, tt.want.response, response)
 			}
-
 		})
 	}
+}
+
+func TestShortenBatch_WithoutUserInContext(t *testing.T) {
+	path := "/api/shorten/batch"
+	payload := "https://go.dev/"
+
+	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
+	r.Header.Set(contentType, textPlain)
+
+	w := httptest.NewRecorder()
+
+	handler, err := New(db.NewInMemoryStore(), 5)
+	require.NoError(t, err, "new handler error")
+
+	handler.ShortenText(w, r)
+
+	res := w.Result()
+
+	response := getResponseTextPayload(t, res)
+	res.Body.Close()
+
+	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
+	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
+		response, "response message mismatch")
 }

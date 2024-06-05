@@ -17,8 +17,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// ShortenText handles the shortening of a long URL.
-func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
+// PostShortenText handles the shortening of a long URL.
+func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	// check the request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.

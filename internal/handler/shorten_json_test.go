@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenJSON(t *testing.T) {
+func TestPostShortenJSON(t *testing.T) {
 	path := "/api/shorten"
 
 	type want struct {
@@ -193,7 +193,7 @@ func TestShortenJSON(t *testing.T) {
 			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
-			handler.ShortenJSON(w, r)
+			handler.PostShortenJSON(w, r)
 
 			res := w.Result()
 
@@ -225,7 +225,7 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 	handler, err := New(db.NewInMemoryStore(), 5)
 	require.NoError(t, err, "new handler error")
 
-	handler.ShortenJSON(w, r)
+	handler.PostShortenJSON(w, r)
 
 	res := w.Result()
 

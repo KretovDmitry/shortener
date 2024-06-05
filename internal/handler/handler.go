@@ -90,12 +90,12 @@ func (h *Handler) Register(r chi.Router) chi.Router {
 	r.Use(middleware.Unzip)
 	r.Use(middleware.Authorization)
 
-	r.Post("/", h.ShortenText)
-	r.Post("/api/shorten", h.ShortenJSON)
-	r.Post("/api/shorten/batch", h.ShortenBatch)
+	r.Post("/", h.PostShortenText)
+	r.Post("/api/shorten", h.PostShortenJSON)
+	r.Post("/api/shorten/batch", h.PostShortenBatch)
 
-	r.Get("/ping", h.PingDB)
-	r.Get("/{shortURL}", h.Redirect)
+	r.Get("/ping", h.GetPingDB)
+	r.Get("/{shortURL}", h.GetRedirect)
 
 	r.Delete("/api/user/urls", h.DeleteURLs)
 

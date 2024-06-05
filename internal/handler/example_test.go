@@ -23,7 +23,7 @@ func Example() {
 	w := httptest.NewRecorder()
 
 	// Make request.
-	handler.ShortenText(w, r)
+	handler.PostShortenText(w, r)
 
 	// Get results.
 	res := w.Result()

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPingDB(t *testing.T) {
+func TestGetPingDB(t *testing.T) {
 	path := "/"
 
 	type want struct {
@@ -103,7 +103,7 @@ func TestPingDB(t *testing.T) {
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			handler.PingDB(w, r)
+			handler.GetPingDB(w, r)
 
 			// get recorded data
 			res := w.Result()

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenText(t *testing.T) {
+func TestPostShortenText(t *testing.T) {
 	path := "/"
 
 	type want struct {
@@ -178,7 +178,7 @@ func TestShortenText(t *testing.T) {
 			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler context error")
 
-			handler.ShortenText(w, r)
+			handler.PostShortenText(w, r)
 
 			res := w.Result()
 
@@ -209,7 +209,7 @@ func TestShortenText_WithoutUserInContext(t *testing.T) {
 	handler, err := New(db.NewInMemoryStore(), 5)
 	require.NoError(t, err, "new handler error")
 
-	handler.ShortenText(w, r)
+	handler.PostShortenText(w, r)
 
 	res := w.Result()
 

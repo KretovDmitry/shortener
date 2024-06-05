@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenBatch(t *testing.T) {
+func TestPostShortenBatch(t *testing.T) {
 	path := "/api/shorten/batch"
 
 	const goodPayload = `
@@ -202,7 +204,7 @@ func TestShortenBatch(t *testing.T) {
 			handler, err := New(tt.store, 5)
 			require.NoError(t, err, "new handler error")
 
-			handler.ShortenBatch(w, r)
+			handler.PostShortenBatch(w, r)
 
 			res := w.Result()
 
@@ -225,17 +227,24 @@ func TestShortenBatch(t *testing.T) {
 
 func TestShortenBatch_WithoutUserInContext(t *testing.T) {
 	path := "/api/shorten/batch"
-	payload := "https://go.dev/"
 
-	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
-	r.Header.Set(contentType, textPlain)
+	payload, err := json.Marshal([]shortenBatchRequestPayload{
+		{
+			CorrelationID: "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
+			OriginalURL:   "https://go.dev/",
+		},
+	})
+	require.NoError(t, err, "failed marshal payload")
+
+	r := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(payload))
+	r.Header.Set(contentType, applicationJSON)
 
 	w := httptest.NewRecorder()
 
 	handler, err := New(db.NewInMemoryStore(), 5)
 	require.NoError(t, err, "new handler error")
 
-	handler.ShortenText(w, r)
+	handler.PostShortenBatch(w, r)
 
 	res := w.Result()
 

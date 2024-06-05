@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHandleShortURLRedirect(t *testing.T) {
+func TestGetRedirect(t *testing.T) {
 	tests := []struct {
 		name           string
 		method         string
@@ -182,7 +182,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			handler.Redirect(w, r)
+			handler.GetRedirect(w, r)
 
 			// get recorded data
 			res := w.Result()

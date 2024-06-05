@@ -24,7 +24,7 @@ type (
 	}
 )
 
-// ShortenBatch handles requests to shorten multiple URLs in a single request.
+// PostShortenBatch handles requests to shorten multiple URLs in a single request.
 //
 // Request:
 //
@@ -60,7 +60,7 @@ type (
 //		},
 //		...
 //	 ]
-func (h *Handler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 	// check the request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.

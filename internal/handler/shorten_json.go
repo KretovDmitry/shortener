@@ -29,7 +29,7 @@ type (
 	}
 )
 
-// ShortenJSON handles the shortening of a long URL.
+// PostShortenJSON handles the shortening of a long URL.
 // The message field should be set to an error message if the shortening failed.
 // Otherwise, success should be set to true and the result field should contain the shortened URL.
 //
@@ -48,7 +48,7 @@ type (
 //		"success": true
 //		"message": "OK"
 //	}
-func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.

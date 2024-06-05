@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,69 +19,72 @@ import (
 	"github.com/KretovDmitry/shortener/internal/logger"
 	_ "github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 func main() {
-	l := logger.Get()
-	defer l.Sync()
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
 
-	// Server run context
+func run() error {
+	// Server run context.
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+	defer serverStopCtx()
 
-	handler, err := initService(serverCtx)
+	logger := logger.Get()
+
+	err := config.ParseFlags()
 	if err != nil {
-		l.Fatal("init service failed", zap.Error(err))
+		return fmt.Errorf("parse flags: %w", err)
+	}
+
+	store, err := db.NewStore(serverCtx)
+	if err != nil {
+		return fmt.Errorf("new store: %w", err)
+	}
+
+	handler, err := handler.New(store, 5)
+	if err != nil {
+		return fmt.Errorf("new handler: %w", err)
 	}
 	defer handler.Stop()
 
-	server := &http.Server{
+	hs := &http.Server{
 		Addr:    config.AddrToRun.String(),
 		Handler: handler.Register(chi.NewRouter()),
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT,
-		syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
+	// Graceful shutdown.
 	go func() {
-		<-sig
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT,
+			syscall.SIGTERM, syscall.SIGQUIT, os.Interrupt)
 
-		if err := server.Shutdown(serverCtx); err != nil {
-			l.Fatal("graceful shutdown failed", zap.Error(err))
+		signal := <-sig
+
+		logger.With(serverCtx, "signal", signal.String()).
+			Infof("Shutting down server with %s timeout",
+				config.ShutdownTimeout)
+
+		if err = hs.Shutdown(serverCtx); err != nil {
+			logger.Errorf("graceful shutdown failed: %s", err)
 		}
 		serverStopCtx()
 	}()
 
-	l.Info("Server has started", zap.String("addr", config.AddrToRun.String()))
-	l.Info("Return address", zap.String("addr", config.AddrToReturn.String()))
-	err = server.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
-		l.Fatal("ListenAndServe failed", zap.Error(err))
+	logger.Infof("Server has started: %s", config.AddrToRun)
+	logger.Infof("Return address: %s", config.AddrToReturn)
+	if err = hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("run server failed: %w", err)
 	}
 
 	// Wait for server context to be stopped
 	select {
 	case <-serverCtx.Done():
 	case <-time.After(config.ShutdownTimeout):
-		l.Fatal("graceful shutdown timed out.. forcing exit")
-	}
-}
-
-func initService(ctx context.Context) (*handler.Handler, error) {
-	err := config.ParseFlags()
-	if err != nil {
-		return nil, fmt.Errorf("parse flags: %w", err)
+		return errors.New("graceful shutdown timed out.. forcing exit")
 	}
 
-	store, err := db.NewStore(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("new store: %w", err)
-	}
-
-	handler, err := handler.New(store, 5)
-	if err != nil {
-		return nil, fmt.Errorf("new handler: %w", err)
-	}
-
-	return handler, nil
+	return nil
 }

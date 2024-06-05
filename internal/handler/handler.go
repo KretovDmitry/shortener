@@ -25,7 +25,7 @@ type Handler struct {
 	// store is the database URL storage.
 	store db.URLStorage
 	// logger is the application logger.
-	logger *zap.Logger
+	logger logger.Logger
 	// deleteURLsChan is a channel for sending deleted URLs to be flushed from the database.
 	deleteURLsChan chan *models.URL
 	// wg is a wait group used to manage the goroutine that flushes deleted URLs.

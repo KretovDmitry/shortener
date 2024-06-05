@@ -48,13 +48,12 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 // RequestLogger is a middleware function that logs the request and response details.
 func Logger(next http.Handler) http.Handler {
 	f := func(w http.ResponseWriter, r *http.Request) {
-		l := logger.Get()
-		defer l.Sync()
+		logger := logger.Get()
 
 		defer func() {
 			if err := recover(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				l.Error("handler panic",
+				logger.Error("handler panic",
 					zap.Any("error", err),
 					zap.ByteString("trace", debug.Stack()),
 				)
@@ -65,7 +64,7 @@ func Logger(next http.Handler) http.Handler {
 
 		// defer function that logs the request details
 		defer func(start time.Time) {
-			l.Info(
+			logger.Info(
 				fmt.Sprintf(
 					"%s request to %s completed",
 					r.Method,

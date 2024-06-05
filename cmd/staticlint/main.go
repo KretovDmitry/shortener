@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/KretovDmitry/shortener/pkg/exitinmain"
-	"github.com/fatih/errwrap"
 	"github.com/kisielk/errcheck/errcheck"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
@@ -181,7 +180,6 @@ func main() {
 
 		// checks that you checked errors.
 		errcheck.Analyzer,
-		errwrap.Analyzer,
 	}
 
 	configChecks := make(map[string]bool)

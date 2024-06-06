@@ -48,7 +48,10 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unsafeptr"
 	"golang.org/x/tools/go/analysis/passes/unusedresult"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
+	"honnef.co/go/tools/quickfix"
+	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
 )
 
 // Config — name of the configuration file.
@@ -182,13 +185,34 @@ func main() {
 		errcheck.Analyzer,
 	}
 
-	configChecks := make(map[string]bool)
+	configChecks := make(map[string]bool, len(cfg.Staticcheck))
 	for _, v := range cfg.Staticcheck {
 		configChecks[v] = true
 	}
 
 	// Add staticcheck's analyzers specified in the configuration file.
 	for _, v := range staticcheck.Analyzers {
+		if configChecks[v.Analyzer.Name] {
+			checks = append(checks, v.Analyzer)
+		}
+	}
+
+	// Add code simplifications analyzers specified in the configuration file.
+	for _, v := range simple.Analyzers {
+		if configChecks[v.Analyzer.Name] {
+			checks = append(checks, v.Analyzer)
+		}
+	}
+
+	// Add stylistic issues analyzers specified in the configuration file.
+	for _, v := range stylecheck.Analyzers {
+		if configChecks[v.Analyzer.Name] {
+			checks = append(checks, v.Analyzer)
+		}
+	}
+
+	// Add quickfixes analyzers specified in the configuration file.
+	for _, v := range quickfix.Analyzers {
 		if configChecks[v.Analyzer.Name] {
 			checks = append(checks, v.Analyzer)
 		}

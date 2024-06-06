@@ -14,8 +14,7 @@
 # Binaries
 cmd/shortener/main
 cmd/shortener/shortener
-cmd/shortener/lint
-*lint
+cmd/staticlint/lint
 
 # Dependency directories (remove the comment below to include it)
 vendor/

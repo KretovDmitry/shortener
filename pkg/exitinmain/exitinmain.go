@@ -1,4 +1,4 @@
-// Package exitmain defines an Analyzer that reports os.Exit call
+// Package exitmain defines an Analyzer that report os.Exit call
 // inside main function of the main package.
 package exitinmain
 

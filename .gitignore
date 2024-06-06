@@ -28,4 +28,4 @@ vendor/
 *.log
 
 # File storage
-*.json
+short-url-db.json

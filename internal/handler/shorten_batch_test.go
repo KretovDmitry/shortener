@@ -210,7 +210,7 @@ func TestPostShortenBatch(t *testing.T) {
 			res := w.Result()
 
 			response := getResponseTextPayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
@@ -250,7 +250,7 @@ func TestShortenBatch_WithoutUserInContext(t *testing.T) {
 	res := w.Result()
 
 	response := getResponseTextPayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),

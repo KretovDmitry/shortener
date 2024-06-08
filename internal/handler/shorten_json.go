@@ -63,7 +63,11 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// decode request body
 	var payload shortenJSONRequestPayload
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			h.logger.Errorf("close body: %v", err)
+		}
+	}()
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		h.shortenJSONError(w, "failed to decode request", err, http.StatusInternalServerError)
 		return

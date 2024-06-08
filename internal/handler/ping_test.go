@@ -111,7 +111,7 @@ func TestGetPingDB(t *testing.T) {
 
 			// read the response and close the body; stop test if failed to read body
 			response := getResponseTextPayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			// assert wanted data
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)

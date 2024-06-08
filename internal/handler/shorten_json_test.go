@@ -199,7 +199,7 @@ func TestPostShortenJSON(t *testing.T) {
 			res := w.Result()
 
 			response := getShortenJSONResponsePayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
@@ -231,7 +231,7 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 	res := w.Result()
 
 	response := getShortenJSONResponsePayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
@@ -242,6 +242,6 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 func getShortenJSONResponsePayload(t *testing.T, r *http.Response) (res shortenJSONResponsePayload) {
 	err := json.NewDecoder(r.Body).Decode(&res)
 	require.NoError(t, err, "failed to decode response JSON")
-	r.Body.Close()
+	require.NoError(t, r.Body.Close(), "failed close body")
 	return
 }

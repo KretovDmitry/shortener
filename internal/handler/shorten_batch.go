@@ -76,7 +76,11 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 
 	// decode the request body
 	var payload []shortenBatchRequestPayload
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			h.logger.Errorf("close body: %v", err)
+		}
+	}()
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		h.textError(w, err.Error(), errs.ErrInvalidRequest, http.StatusInternalServerError)
 		return

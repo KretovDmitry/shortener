@@ -45,7 +45,7 @@ func TestGetAllByUserID_Method(t *testing.T) {
 			res := w.Result()
 
 			response := getResponseTextPayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 			assert.Equal(t, textPlain, res.Header.Get(contentType))
@@ -69,7 +69,7 @@ func TestGetAllByUserID_WithoutUserInContext(t *testing.T) {
 	res := w.Result()
 
 	response := getResponseTextPayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
@@ -93,7 +93,7 @@ func TestGetAllByUserID_NoData(t *testing.T) {
 	res := w.Result()
 
 	response := getResponseTextPayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusNoContent, res.StatusCode)
 	assert.Equal(t, textPlain, res.Header.Get(contentType))
@@ -136,7 +136,7 @@ func TestGetAllByUserID_Data(t *testing.T) {
 	res := w.Result()
 
 	response := decodeAllByUserIDResponsePayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, applicationJSON, res.Header.Get(contentType))
@@ -150,6 +150,6 @@ func TestGetAllByUserID_Data(t *testing.T) {
 func decodeAllByUserIDResponsePayload(t *testing.T, r *http.Response) (res []getAllByUserIDResponsePayload) {
 	err := json.NewDecoder(r.Body).Decode(&res)
 	require.NoError(t, err, "failed to decode response JSON")
-	r.Body.Close()
+	require.NoError(t, r.Body.Close(), "failed close body")
 	return
 }

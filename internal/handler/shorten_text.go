@@ -32,7 +32,11 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read the request body.
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			h.logger.Errorf("close body: %v", err)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.textError(w, "failed to read request body", err, http.StatusInternalServerError)

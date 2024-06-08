@@ -39,7 +39,7 @@ func run() error {
 		return fmt.Errorf("parse flags: %w", err)
 	}
 
-	store, err := db.NewStore(serverCtx)
+	store, err := db.NewStore(serverCtx, logger)
 	if err != nil {
 		return fmt.Errorf("new store: %w", err)
 	}

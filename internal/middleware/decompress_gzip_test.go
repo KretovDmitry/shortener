@@ -17,7 +17,7 @@ func TestUnzip(t *testing.T) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		r.Body.Close()
+		require.NoError(t, r.Body.Close(), "failed close body")
 		_, err = w.Write(body)
 		require.NoError(t, err)
 	}))
@@ -44,12 +44,13 @@ func TestUnzip(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			r.Header.Set("Content-Encoding", tt.contentEncoding)
+
 			handler = Unzip(handler)
 
 			handler.ServeHTTP(w, r)
 
 			result := w.Result()
-			defer result.Body.Close()
+			require.NoError(t, result.Body.Close(), "failed close body")
 
 			body, err := io.ReadAll(result.Body)
 			assert.NoError(t, err)
@@ -61,12 +62,14 @@ func TestUnzip(t *testing.T) {
 
 func compress(data []byte) []byte {
 	var b bytes.Buffer
-	wr := gzip.NewWriter(&b)
-	_, err := wr.Write(data)
+	gz := gzip.NewWriter(&b)
+	_, err := gz.Write(data)
 	if err != nil {
 		panic(err)
 	}
-	wr.Close() // DO NOT DEFER HERE
-
+	err = gz.Close() // DO NOT DEFER HERE
+	if err != nil {
+		panic(err)
+	}
 	return b.Bytes()
 }

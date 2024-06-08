@@ -112,7 +112,7 @@ func TestNew(t *testing.T) {
 
 func getResponseTextPayload(t *testing.T, res *http.Response) string {
 	resBody, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 	require.NoError(t, err)
 	return strings.TrimSpace(string(resBody))
 }

@@ -28,7 +28,7 @@ func Example() {
 	// Get results.
 	res := w.Result()
 	b, _ := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close()
 
 	if bytes.HasPrefix(b, []byte("http")) {
 		fmt.Println(string(b[bytes.LastIndex(b, []byte("/"))+1:]))

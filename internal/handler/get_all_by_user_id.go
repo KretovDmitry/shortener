@@ -34,7 +34,11 @@ type getAllByUserIDResponsePayload struct {
 //		...
 //	]
 func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			h.logger.Errorf("close body: %v", err)
+		}
+	}()
 
 	// check request method
 	if r.Method != http.MethodGet {

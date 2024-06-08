@@ -10,6 +10,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestGetAllByUserID_Method(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(db.NewInMemoryStore(), 5)
+			handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 			require.NoError(t, err, "new handler error")
 
 			handler.GetAllByUserID(w, r)
@@ -60,7 +61,7 @@ func TestGetAllByUserID_WithoutUserInContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), 5)
+	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -84,7 +85,7 @@ func TestGetAllByUserID_NoData(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), 5)
+	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -127,7 +128,7 @@ func TestGetAllByUserID_Data(t *testing.T) {
 	})
 	require.NoError(t, err, "save failed")
 
-	handler, err := New(mock, 5)
+	handler, err := New(mock, logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)

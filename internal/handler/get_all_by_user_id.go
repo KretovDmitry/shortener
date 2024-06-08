@@ -8,7 +8,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
-	"go.uber.org/zap"
 )
 
 type getAllByUserIDResponsePayload struct {
@@ -73,7 +72,7 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 
 	// encode response body
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.logger.Error("failed to encode response", zap.Error(err))
+		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
-	"go.uber.org/zap"
 )
 
 type (
@@ -24,8 +23,8 @@ type (
 
 	shortenJSONResponsePayload struct {
 		Result  models.ShortURL `json:"result"`
-		Success bool            `json:"success"`
 		Message string          `json:"message"`
+		Success bool            `json:"success"`
 	}
 )
 
@@ -133,7 +132,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// encode response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		h.logger.Error("failed to encode response", zap.Error(err))
+		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -143,9 +142,9 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 // headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
-		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
+		h.logger.Errorf("%s: %s", message, err)
 	} else {
-		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
+		h.logger.Infof("%s: %s", message, err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -154,7 +153,7 @@ func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err er
 		Message: fmt.Sprintf("%s: %s", err, message),
 	})
 	if err != nil {
-		h.logger.Error("failed to encode response", zap.Error(err))
+		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

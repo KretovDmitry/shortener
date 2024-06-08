@@ -7,7 +7,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
-	"go.uber.org/zap"
 )
 
 // DeleteByUserID deletes a list of shortened URLs owned by a specific user.
@@ -50,8 +49,6 @@ func (h *Handler) DeleteURLs(w http.ResponseWriter, r *http.Request) {
 			err, http.StatusInternalServerError)
 		return
 	}
-
-	h.logger.Info("got delete request", zap.Any("urls", payload))
 
 	// Schedule deletion of the URLs.
 	for _, shortURL := range payload {

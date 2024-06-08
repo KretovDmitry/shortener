@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
@@ -19,8 +20,8 @@ func TestPostShortenText(t *testing.T) {
 	path := "/"
 
 	type want struct {
-		statusCode int
 		response   string
+		statusCode int
 	}
 
 	tests := []struct {
@@ -175,7 +176,7 @@ func TestPostShortenText(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler context error")
 
 			handler.PostShortenText(w, r)
@@ -206,7 +207,7 @@ func TestShortenText_WithoutUserInContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), 5)
+	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
 	handler.PostShortenText(w, r)

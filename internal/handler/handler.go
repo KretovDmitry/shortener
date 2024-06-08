@@ -2,16 +2,15 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -37,14 +36,17 @@ type Handler struct {
 }
 
 // New constructs a new handler, ensuring that the dependencies are valid values.
-func New(store db.URLStorage, bufLen int) (*Handler, error) {
+func New(store db.URLStorage, logger logger.Logger, bufLen int) (*Handler, error) {
 	if store == nil {
-		return nil, errors.New("nil store")
+		return nil, fmt.Errorf("%w: nil store", errs.ErrNilDependency)
+	}
+	if logger == nil {
+		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
 	}
 
 	h := &Handler{
 		store:          store,
-		logger:         logger.Get(),
+		logger:         logger,
 		deleteURLsChan: make(chan *models.URL),
 		wg:             &sync.WaitGroup{},
 		done:           make(chan struct{}),
@@ -161,27 +163,16 @@ func (h *Handler) flush(URLs ...*models.URL) error {
 // textError writes error response to the response writer in a text/plain format.
 func (h *Handler) textError(w http.ResponseWriter, message string, err error, code int) {
 	if code >= 500 {
-		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
+		h.logger.Errorf("%s: %s", message, err)
 	} else {
-		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
+		h.logger.Infof("%s: %s", message, err)
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(code)
-	_, err = fmt.Fprintf(w, "%s: %s", err, message)
-	if err != nil {
-		h.logger.Error("failed to write response", zap.Error(err))
+	if _, err = fmt.Fprintf(w, "%s: %s", err, message); err != nil {
+		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-// caller returns a file and line from a specified depth in the call stack.
-func caller(depth int) string {
-	_, file, line, _ := runtime.Caller(depth)
-	idx := strings.LastIndexByte(file, '/')
-	// using idx+1 below handles both of following cases:
-	// idx == -1 because no "/" was found, or
-	// idx >= 0 and we want to start at the character after the found "/"
-	return fmt.Sprintf("%s:%d", file[idx+1:], line)
 }
 
 // IsApplicationJSONContentType returns true if the content type of the

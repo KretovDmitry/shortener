@@ -44,7 +44,7 @@ func run() error {
 		return fmt.Errorf("new store: %w", err)
 	}
 
-	handler, err := handler.New(store, 5)
+	handler, err := handler.New(store, logger, 5)
 	if err != nil {
 		return fmt.Errorf("new handler: %w", err)
 	}

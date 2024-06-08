@@ -14,7 +14,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
-	"go.uber.org/zap"
 )
 
 // PostShortenText handles the shortening of a long URL.
@@ -106,7 +105,7 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	// Write the response body.
 	_, err = fmt.Fprintf(w, "http://%s/%s", config.AddrToReturn, generatedShortURL)
 	if err != nil {
-		h.logger.Error("failed to write response", zap.Error(err))
+		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -55,9 +55,7 @@ const (
 
 // Get creates a new logger using the default configuration.
 func Get() *Log {
-	var once sync.Once
-
-	once.Do(func() {
+	sync.OnceFunc(func() {
 		stdout := zapcore.AddSync(os.Stdout)
 
 		file := zapcore.AddSync(&lumberjack.Logger{
@@ -112,9 +110,12 @@ func Get() *Log {
 		)
 
 		zap.ReplaceGlobals(zap.New(core))
-	})
+	})()
 
-	return NewWithZap(zap.L())
+	return NewWithZap(zap.L().WithOptions(
+		zap.AddCaller(),
+		zap.AddCallerSkip(1),
+	))
 }
 
 // NewWithZap creates a new logger using the preconfigured zap logger.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -17,11 +18,11 @@ import (
 
 func TestGetRedirect(t *testing.T) {
 	tests := []struct {
+		store          db.URLStorage
+		assertResponse func(res *http.Response)
 		name           string
 		method         string
 		shortURL       string
-		store          db.URLStorage
-		assertResponse func(res *http.Response)
 	}{
 		{
 			name:     "positive test #1",
@@ -178,7 +179,7 @@ func TestGetRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

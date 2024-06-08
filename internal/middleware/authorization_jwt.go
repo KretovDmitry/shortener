@@ -17,7 +17,6 @@ import (
 // It will not let pass through if a token is not provided or couldn't be parsed.
 func OnlyWithToken(next http.Handler) http.Handler {
 	l := logger.Get()
-	defer l.Sync()
 
 	f := func(w http.ResponseWriter, r *http.Request) {
 		authCookie, err := r.Cookie("Authorization")
@@ -52,7 +51,6 @@ func OnlyWithToken(next http.Handler) http.Handler {
 // It will create new user id if cookie is not provided.
 func Authorization(next http.Handler) http.Handler {
 	l := logger.Get()
-	defer l.Sync()
 
 	f := func(w http.ResponseWriter, r *http.Request) {
 		authCookie, err := r.Cookie("Authorization")

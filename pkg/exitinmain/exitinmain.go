@@ -10,6 +10,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
+// Analyzer is a go analysis package analyzer implementation.
 var Analyzer = &analysis.Analyzer{
 	Name:     "exitinmain",
 	Doc:      "reports os.Exit call inside main function of the main package",

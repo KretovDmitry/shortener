@@ -42,6 +42,7 @@ type Logger interface {
 	Sync() error
 }
 
+// Log is a zap sugared logger wrraper with additional functionality.
 type Log struct {
 	*zap.SugaredLogger
 }

@@ -59,7 +59,7 @@ func run() error {
 
 	hs := &http.Server{
 		Addr:    config.AddrToRun.String(),
-		Handler: handler.Register(chi.NewRouter()),
+		Handler: handler.Register(chi.NewRouter(), logger),
 	}
 
 	// Graceful shutdown.

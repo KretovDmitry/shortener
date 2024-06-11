@@ -14,6 +14,7 @@ import (
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/pkg/accesslog"
 	"github.com/go-chi/chi/v5"
 	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
@@ -86,8 +87,8 @@ func (h *Handler) Stop() {
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *Handler) Register(r chi.Router) chi.Router {
-	r.Use(middleware.Logger)
+func (h *Handler) Register(r chi.Router, logger logger.Logger) chi.Router {
+	r.Use(accesslog.Handler(logger))
 	r.Use(gzip.DefaultHandler().WrapHandler)
 	r.Use(middleware.Unzip)
 	r.Use(middleware.Authorization)

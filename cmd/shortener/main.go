@@ -21,7 +21,14 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
@@ -87,4 +94,22 @@ func run() error {
 	}
 
 	return nil
+}
+
+func printBuildInfo() {
+	if buildVersion == "" {
+		fmt.Println("Build version: N/A")
+	} else {
+		fmt.Printf("Build version: %s\n", buildVersion)
+	}
+	if buildDate == "" {
+		fmt.Println("Build date: N/A")
+	} else {
+		fmt.Printf("Build date: %s\n", buildDate)
+	}
+	if buildCommit == "" {
+		fmt.Println("Build commit: N/A")
+	} else {
+		fmt.Printf("Build commit: %s\n", buildCommit)
+	}
 }

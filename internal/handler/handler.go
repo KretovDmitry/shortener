@@ -162,10 +162,11 @@ func (h *Handler) flush(URLs ...*models.URL) error {
 
 // textError writes error response to the response writer in a text/plain format.
 func (h *Handler) textError(w http.ResponseWriter, message string, err error, code int) {
+	logger := h.logger.SkipCaller(1)
 	if code >= 500 {
-		h.logger.Errorf("%s: %s", message, err)
+		logger.Errorf("%s: %s", message, err)
 	} else {
-		h.logger.Infof("%s: %s", message, err)
+		logger.Infof("%s: %s", message, err)
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(code)

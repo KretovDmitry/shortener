@@ -40,12 +40,19 @@ type Logger interface {
 
 	// Sync flushes any buffered log entries.
 	Sync() error
+
+	// SkipCaller allows skip wrappers in the call stack to log actual
+	// caller location.
+	SkipCaller(depth int) Logger
 }
 
 // Log is a zap sugared logger wrraper with additional functionality.
 type Log struct {
 	*zap.SugaredLogger
 }
+
+// Interface implementation check.
+var _ Logger = (*Log)(nil)
 
 type contextKey int
 
@@ -113,15 +120,18 @@ func Get() *Log {
 		zap.ReplaceGlobals(zap.New(core))
 	})()
 
-	return NewWithZap(zap.L().WithOptions(
-		zap.AddCaller(),
-		zap.AddCallerSkip(1),
-	))
+	return NewWithZap(zap.L().WithOptions(zap.AddCaller()))
 }
 
 // NewWithZap creates a new logger using the preconfigured zap logger.
 func NewWithZap(l *zap.Logger) *Log {
 	return &Log{l.Sugar()}
+}
+
+// SkipCaller allows skip wrappers in the call stack to log actual
+// caller location.
+func (l *Log) SkipCaller(depth int) Logger {
+	return &Log{l.WithOptions(zap.AddCallerSkip(depth))}
 }
 
 // NewForTest returns a new logger and the corresponding observed logs

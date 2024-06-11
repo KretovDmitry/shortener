@@ -145,10 +145,11 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 // shortenJSONError is a helper function that sets the appropriate response
 // headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
+	logger := h.logger.SkipCaller(1)
 	if code >= 500 {
-		h.logger.Errorf("%s: %s", message, err)
+		logger.Errorf("%s: %s", message, err)
 	} else {
-		h.logger.Infof("%s: %s", message, err)
+		logger.Infof("%s: %s", message, err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

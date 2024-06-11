@@ -98,7 +98,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 	defer func() {
 		if err = tx.Rollback(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("rollback: %w", err)
+				pg.logger.Errorf("rollback: %v", err)
 			}
 		}
 	}()
@@ -110,7 +110,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 	defer func() {
 		if err = stmt.Close(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("close prepared statement: %w", err)
+				pg.logger.Errorf("close prepared statement: %v", err)
 			}
 		}
 	}()
@@ -203,7 +203,7 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 	// Close the rows when the function returns.
 	defer func() {
 		if err = rows.Close(); err != nil {
-			pg.logger.Errorf("close rows: %w", err)
+			pg.logger.Errorf("close rows: %v", err)
 		}
 	}()
 
@@ -255,7 +255,7 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	defer func() {
 		if err = tx.Rollback(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("rollback: %w", err)
+				pg.logger.Errorf("rollback: %v", err)
 			}
 		}
 	}()
@@ -267,7 +267,7 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	defer func() {
 		if err = stmt.Close(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("close prepared statement: %w", err)
+				pg.logger.Errorf("close prepared statement: %v", err)
 			}
 		}
 	}()

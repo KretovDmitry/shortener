@@ -8,31 +8,15 @@ import (
 	"github.com/itchyny/base58-go"
 )
 
-// sha256of hashes the initial input using standard sha256 hash function
-func sha256Of(input []byte) []byte {
-	algorithm := sha256.New()
-	algorithm.Write(input)
-	return algorithm.Sum(nil)
-}
-
-// base58Encoded utilizes Base58 algorithm instead of standard base-64 encoding
-// Base58 reduces confusion in character output (0OIl+/ are not used).
-func base58Encoded(bytes []byte) (string, error) {
-	encoding := base58.BitcoinEncoding
-	encoded, err := encoding.Encode(bytes)
-	if err != nil {
-		return "", err
-	}
-	return string(encoded), nil
-}
-
-// Generate produces a short link with a length of 8 characters from the original one
-func Generate(initialLink string) (string, error) {
-	urlHashBytes := sha256Of([]byte(initialLink))
+// Generate produces a short link from the original one.
+// It utilizes base 58 algorithm to reduce confusion in character output
+// (0OIl+/ are not used).
+func Generate(s string) string {
+	sha256 := sha256.New()
+	sha256.Write([]byte(s))
+	urlHashBytes := sha256.Sum(nil)
 	generatedNumber := binary.BigEndian.Uint64(urlHashBytes)
-	finalString, err := base58Encoded([]byte(fmt.Sprintf("%d", generatedNumber)))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate short link: %w", err)
-	}
-	return finalString[:8], nil
+	encodedBytes := base58.BitcoinEncoding.EncodeUint64(generatedNumber)
+	fmt.Println(string(encodedBytes))
+	return string(encodedBytes)
 }

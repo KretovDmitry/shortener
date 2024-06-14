@@ -43,7 +43,7 @@ type (
 //	HTTP/1.1 201 Created
 //	Content-Type: application/json
 //	{
-//		"result": "http://config.AddrToReturn/Base58{8}"
+//		"result": "http://config.AddrToReturn/Base58"
 //		"success": true
 //		"message": "OK"
 //	}
@@ -86,11 +86,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate short URL
-	generatedShortURL, err := shorturl.Generate(payload.URL)
-	if err != nil {
-		h.shortenJSONError(w, "failed to shorten url", err, http.StatusInternalServerError)
-		return
-	}
+	generatedShortURL := shorturl.Generate(payload.URL)
 
 	user, ok := user.FromContext(r.Context())
 	if !ok {

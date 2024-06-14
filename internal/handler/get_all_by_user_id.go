@@ -28,7 +28,7 @@ type getAllByUserIDResponsePayload struct {
 //
 //	[
 //		{
-//		    "short_url": "http://config.AddrToReturn/Base58{8}",
+//		    "short_url": "http://config.AddrToReturn/Base58",
 //		    "original_url": "http://..."
 //		},
 //		...

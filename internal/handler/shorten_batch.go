@@ -52,11 +52,11 @@ type (
 //
 //		{
 //			"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//			"short_url": "http://config.AddrToReturn/Base58{8}"
+//			"short_url": "http://config.AddrToReturn/Base58"
 //		},
 //		{
 //			"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//			"short_url": "http://config.AddrToReturn/Base58{8}"
+//			"short_url": "http://config.AddrToReturn/Base58"
 //		},
 //		...
 //	 ]
@@ -111,12 +111,7 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// generate short URL
-		shortURL, err := shorturl.Generate(p.OriginalURL)
-		if err != nil {
-			h.textError(w, "failed to shorten url", err, http.StatusInternalServerError)
-			return
-		}
-
+		shortURL := shorturl.Generate(p.OriginalURL)
 		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, user.ID)
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}

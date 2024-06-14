@@ -30,7 +30,7 @@ func TestGetRedirect(t *testing.T) {
 			shortURL: "TZqSKV4t",
 			store: initMockStore(&models.URL{
 				OriginalURL: "https://e.mail.ru/inbox/",
-				ShortURL:    "TZqSKV4t",
+				ShortURL:    "TZqSKV4tcyE",
 			}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")

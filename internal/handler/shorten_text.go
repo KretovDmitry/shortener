@@ -59,11 +59,7 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate the shortened URL.
-	generatedShortURL, err := shorturl.Generate(originalURL)
-	if err != nil {
-		h.textError(w, "failed to shorten url: "+originalURL, err, http.StatusInternalServerError)
-		return
-	}
+	generatedShortURL := shorturl.Generate(originalURL)
 
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -66,19 +67,19 @@ func main() {
 	// Get the path name for the executable that started the current process.
 	appfile, err := os.Executable()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Read configuration file.
 	data, err := os.ReadFile(filepath.Join(filepath.Dir(appfile), Config))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Decode file.
 	var cfg ConfigData
 	if err = json.Unmarshal(data, &cfg); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	checks := []*analysis.Analyzer{

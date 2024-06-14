@@ -19,14 +19,14 @@ var Analyzer = &analysis.Analyzer{
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	// get the inspector. This will not panic because inspect.Analyzer is part
+	// Get the inspector. This will not panic because inspect.Analyzer is part
 	// of `Requires`. go/analysis will populate the `pass.ResultOf` map with
 	// the prerequisite analyzers.
 	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
-	// the inspector has a `filter` feature that enables type-based filtering
+	// The inspector has a `filter` feature that enables type-based filtering
 	// The anonymous function will be only called for the ast nodes whose type
-	// matches an element in the filter
+	// matches an element in the filter.
 	nodeFilter := []ast.Node{
 		(*ast.File)(nil),
 		(*ast.FuncDecl)(nil),
@@ -35,7 +35,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 	var insideMain bool
 
-	// this is basically the same as ast.Inspect(), only we don't return a
+	// This is basically the same as ast.Inspect(), only we don't return a
 	// boolean anymore as it'll visit all the nodes based on the filter.
 	inspect.Preorder(nodeFilter, func(n ast.Node) {
 		switch x := n.(type) {

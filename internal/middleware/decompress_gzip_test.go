@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -65,11 +66,11 @@ func compress(data []byte) []byte {
 	gz := gzip.NewWriter(&b)
 	_, err := gz.Write(data)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	err = gz.Close() // DO NOT DEFER HERE
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	return b.Bytes()
 }

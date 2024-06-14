@@ -8,16 +8,17 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestPingDB(t *testing.T) {
+func TestGetPingDB(t *testing.T) {
 	path := "/"
 
 	type want struct {
-		statusCode int
 		response   string
+		statusCode int
 	}
 
 	tests := []struct {
@@ -99,18 +100,18 @@ func TestPingDB(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			handler.PingDB(w, r)
+			handler.GetPingDB(w, r)
 
 			// get recorded data
 			res := w.Result()
 
 			// read the response and close the body; stop test if failed to read body
 			response := getResponseTextPayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			// assert wanted data
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)

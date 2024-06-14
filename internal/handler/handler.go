@@ -2,19 +2,19 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/pkg/accesslog"
 	"github.com/go-chi/chi/v5"
 	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ type Handler struct {
 	// store is the database URL storage.
 	store db.URLStorage
 	// logger is the application logger.
-	logger *zap.Logger
+	logger logger.Logger
 	// deleteURLsChan is a channel for sending deleted URLs to be flushed from the database.
 	deleteURLsChan chan *models.URL
 	// wg is a wait group used to manage the goroutine that flushes deleted URLs.
@@ -37,14 +37,17 @@ type Handler struct {
 }
 
 // New constructs a new handler, ensuring that the dependencies are valid values.
-func New(store db.URLStorage, bufLen int) (*Handler, error) {
+func New(store db.URLStorage, logger logger.Logger, bufLen int) (*Handler, error) {
 	if store == nil {
-		return nil, errors.New("nil store")
+		return nil, fmt.Errorf("%w: nil store", errs.ErrNilDependency)
+	}
+	if logger == nil {
+		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
 	}
 
 	h := &Handler{
 		store:          store,
-		logger:         logger.Get(),
+		logger:         logger,
 		deleteURLsChan: make(chan *models.URL),
 		wg:             &sync.WaitGroup{},
 		done:           make(chan struct{}),
@@ -84,18 +87,18 @@ func (h *Handler) Stop() {
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *Handler) Register(r chi.Router) chi.Router {
-	r.Use(middleware.Logger)
+func (h *Handler) Register(r chi.Router, logger logger.Logger) chi.Router {
+	r.Use(accesslog.Handler(logger))
 	r.Use(gzip.DefaultHandler().WrapHandler)
 	r.Use(middleware.Unzip)
 	r.Use(middleware.Authorization)
 
-	r.Post("/", h.ShortenText)
-	r.Post("/api/shorten", h.ShortenJSON)
-	r.Post("/api/shorten/batch", h.ShortenBatch)
+	r.Post("/", h.PostShortenText)
+	r.Post("/api/shorten", h.PostShortenJSON)
+	r.Post("/api/shorten/batch", h.PostShortenBatch)
 
-	r.Get("/ping", h.PingDB)
-	r.Get("/{shortURL}", h.Redirect)
+	r.Get("/ping", h.GetPingDB)
+	r.Get("/{shortURL}", h.GetRedirect)
 
 	r.Delete("/api/user/urls", h.DeleteURLs)
 
@@ -160,28 +163,18 @@ func (h *Handler) flush(URLs ...*models.URL) error {
 
 // textError writes error response to the response writer in a text/plain format.
 func (h *Handler) textError(w http.ResponseWriter, message string, err error, code int) {
+	logger := h.logger.SkipCaller(1)
 	if code >= 500 {
-		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
+		logger.Errorf("%s: %s", message, err)
 	} else {
-		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
+		logger.Infof("%s: %s", message, err)
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(code)
-	_, err = fmt.Fprintf(w, "%s: %s", err, message)
-	if err != nil {
-		h.logger.Error("failed to write response", zap.Error(err))
+	if _, err = fmt.Fprintf(w, "%s: %s", err, message); err != nil {
+		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-// caller returns a file and line from a specified depth in the call stack.
-func caller(depth int) string {
-	_, file, line, _ := runtime.Caller(depth)
-	idx := strings.LastIndexByte(file, '/')
-	// using idx+1 below handles both of following cases:
-	// idx == -1 because no "/" was found, or
-	// idx >= 0 and we want to start at the character after the found "/"
-	return fmt.Sprintf("%s:%d", file[idx+1:], line)
 }
 
 // IsApplicationJSONContentType returns true if the content type of the

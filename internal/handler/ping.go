@@ -7,12 +7,12 @@ import (
 	"github.com/KretovDmitry/shortener/internal/errs"
 )
 
-// PingDB checks the status of the database connection.
+// GetPingDB checks the status of the database connection.
 //
 // Request:
 //
 //	GET /ping
-func (h *Handler) PingDB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetPingDB(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodGet {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.

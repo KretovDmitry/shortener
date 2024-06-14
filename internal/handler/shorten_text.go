@@ -14,11 +14,10 @@ import (
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
-	"go.uber.org/zap"
 )
 
-// ShortenText handles the shortening of a long URL.
-func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
+// PostShortenText handles the shortening of a long URL.
+func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	// check the request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
@@ -33,7 +32,11 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read the request body.
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			h.logger.Errorf("close body: %v", err)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.textError(w, "failed to read request body", err, http.StatusInternalServerError)
@@ -106,7 +109,7 @@ func (h *Handler) ShortenText(w http.ResponseWriter, r *http.Request) {
 	// Write the response body.
 	_, err = fmt.Fprintf(w, "http://%s/%s", config.AddrToReturn, generatedShortURL)
 	if err != nil {
-		h.logger.Error("failed to write response", zap.Error(err))
+		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

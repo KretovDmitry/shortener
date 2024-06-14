@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,13 +12,14 @@ import (
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenBatch(t *testing.T) {
+func TestPostShortenBatch(t *testing.T) {
 	path := "/api/shorten/batch"
 
 	const goodPayload = `
@@ -43,8 +46,8 @@ func TestShortenBatch(t *testing.T) {
 	]`
 
 	type want struct {
-		statusCode int
 		response   string
+		statusCode int
 	}
 
 	tests := []struct {
@@ -199,15 +202,15 @@ func TestShortenBatch(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler error")
 
-			handler.ShortenBatch(w, r)
+			handler.PostShortenBatch(w, r)
 
 			res := w.Result()
 
 			response := getResponseTextPayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
@@ -225,22 +228,29 @@ func TestShortenBatch(t *testing.T) {
 
 func TestShortenBatch_WithoutUserInContext(t *testing.T) {
 	path := "/api/shorten/batch"
-	payload := "https://go.dev/"
 
-	r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
-	r.Header.Set(contentType, textPlain)
+	payload, err := json.Marshal([]shortenBatchRequestPayload{
+		{
+			CorrelationID: "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
+			OriginalURL:   "https://go.dev/",
+		},
+	})
+	require.NoError(t, err, "failed marshal payload")
+
+	r := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(payload))
+	r.Header.Set(contentType, applicationJSON)
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), 5)
+	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
-	handler.ShortenText(w, r)
+	handler.PostShortenBatch(w, r)
 
 	res := w.Result()
 
 	response := getResponseTextPayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),

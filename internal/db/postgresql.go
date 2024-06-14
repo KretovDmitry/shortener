@@ -9,6 +9,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -18,12 +19,21 @@ import (
 )
 
 type postgresStore struct {
-	store *sql.DB
+	store  *sql.DB
+	logger logger.Logger
 }
 
 // NewPostgresStore creates a new Postgres database connection pool
 // and initializes the database schema.
-func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
+func NewPostgresStore(
+	ctx context.Context,
+	dsn string,
+	logger logger.Logger,
+) (*postgresStore, error) {
+	if logger == nil {
+		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
+	}
+
 	DB, err := goose.OpenDBWithDriver("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("goose: failed to open DB: %v", err)
@@ -34,7 +44,10 @@ func NewPostgresStore(ctx context.Context, dsn string) (*postgresStore, error) {
 		return nil, fmt.Errorf("goose: failed to migrate DB: %v", err)
 	}
 
-	return &postgresStore{store: DB}, nil
+	return &postgresStore{
+		store:  DB,
+		logger: logger,
+	}, nil
 }
 
 // Save saves a new URL record to the database.
@@ -82,13 +95,25 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			if errors.Is(err, sql.ErrTxDone) {
+				pg.logger.Errorf("rollback: %v", err)
+			}
+		}
+	}()
 
 	stmt, err := tx.PrepareContext(ctx, q)
 	if err != nil {
 		return fmt.Errorf("prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() {
+		if err = stmt.Close(); err != nil {
+			if errors.Is(err, sql.ErrTxDone) {
+				pg.logger.Errorf("close prepared statement: %v", err)
+			}
+		}
+	}()
 
 	for _, url := range urls {
 		_, err := stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL, url.UserID)
@@ -175,7 +200,12 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 
 		return nil, fmt.Errorf("retrieve url with query (%s): %w", formatQuery(q), err)
 	}
-	defer rows.Close() // Close the rows when the function returns.
+	// Close the rows when the function returns.
+	defer func() {
+		if err = rows.Close(); err != nil {
+			pg.logger.Errorf("close rows: %v", err)
+		}
+	}()
 
 	all := make([]*models.URL, 0) // Initialize an empty slice to store the URL pointers.
 	for rows.Next() {
@@ -222,13 +252,25 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			if errors.Is(err, sql.ErrTxDone) {
+				pg.logger.Errorf("rollback: %v", err)
+			}
+		}
+	}()
 
 	stmt, err := tx.PrepareContext(ctx, q)
 	if err != nil {
 		return fmt.Errorf("prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() {
+		if err = stmt.Close(); err != nil {
+			if errors.Is(err, sql.ErrTxDone) {
+				pg.logger.Errorf("close prepared statement: %v", err)
+			}
+		}
+	}()
 
 	for _, url := range urls {
 		_, err := stmt.ExecContext(ctx, url.ShortURL)

@@ -51,7 +51,6 @@ func (c *compressReader) Close() error {
 // Unzip decides whether or not to decompress request judging by content encoding.
 func Unzip(next http.Handler) http.Handler {
 	l := logger.Get()
-	defer l.Sync()
 
 	f := func(w http.ResponseWriter, r *http.Request) {
 		contentEncoding := r.Header.Get("Content-Encoding")
@@ -64,7 +63,11 @@ func Unzip(next http.Handler) http.Handler {
 				return
 			}
 			r.Body = cr
-			defer cr.Close()
+			defer func() {
+				if err = cr.Close(); err != nil {
+					l.Errorf("close compress reader: %v", err)
+				}
+			}()
 		}
 
 		next.ServeHTTP(w, r)

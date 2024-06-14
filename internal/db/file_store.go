@@ -95,8 +95,10 @@ func NewFileStore(filepath string) (*fileStore, error) {
 		return nil, fmt.Errorf("new consumer: %w", err)
 	}
 
+	var record *models.URL
+
 	for {
-		record, err := consumer.ReadRecord()
+		record, err = consumer.ReadRecord()
 		if record != nil {
 			if err = fileStore.cache.Save(context.TODO(), record); err != nil {
 				return nil, fmt.Errorf("save record: %w", err)

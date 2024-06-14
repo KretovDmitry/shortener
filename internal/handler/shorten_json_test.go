@@ -11,18 +11,19 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenJSON(t *testing.T) {
+func TestPostShortenJSON(t *testing.T) {
 	path := "/api/shorten"
 
 	type want struct {
-		statusCode int
 		response   string
+		statusCode int
 	}
 
 	tests := []struct {
@@ -190,15 +191,15 @@ func TestShortenJSON(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler context error")
 
-			handler.ShortenJSON(w, r)
+			handler.PostShortenJSON(w, r)
 
 			res := w.Result()
 
 			response := getShortenJSONResponsePayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			switch {
@@ -222,15 +223,15 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), 5)
+	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
-	handler.ShortenJSON(w, r)
+	handler.PostShortenJSON(w, r)
 
 	res := w.Result()
 
 	response := getShortenJSONResponsePayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
@@ -241,6 +242,6 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 func getShortenJSONResponsePayload(t *testing.T, r *http.Response) (res shortenJSONResponsePayload) {
 	err := json.NewDecoder(r.Body).Decode(&res)
 	require.NoError(t, err, "failed to decode response JSON")
-	r.Body.Close()
+	require.NoError(t, r.Body.Close(), "failed close body")
 	return
 }

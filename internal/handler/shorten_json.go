@@ -14,7 +14,6 @@ import (
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/shorturl"
 	"github.com/asaskevich/govalidator"
-	"go.uber.org/zap"
 )
 
 type (
@@ -24,12 +23,12 @@ type (
 
 	shortenJSONResponsePayload struct {
 		Result  models.ShortURL `json:"result"`
-		Success bool            `json:"success"`
 		Message string          `json:"message"`
+		Success bool            `json:"success"`
 	}
 )
 
-// ShortenJSON handles the shortening of a long URL.
+// PostShortenJSON handles the shortening of a long URL.
 // The message field should be set to an error message if the shortening failed.
 // Otherwise, success should be set to true and the result field should contain the shortened URL.
 //
@@ -48,7 +47,7 @@ type (
 //		"success": true
 //		"message": "OK"
 //	}
-func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	// check request method
 	if r.Method != http.MethodPost {
 		// Yandex Practicum requires 400 Bad Request instead of 405 Method Not Allowed.
@@ -64,7 +63,11 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// decode request body
 	var payload shortenJSONRequestPayload
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			h.logger.Errorf("close body: %v", err)
+		}
+	}()
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		h.shortenJSONError(w, "failed to decode request", err, http.StatusInternalServerError)
 		return
@@ -133,7 +136,7 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 
 	// encode response body
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		h.logger.Error("failed to encode response", zap.Error(err))
+		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -142,10 +145,11 @@ func (h *Handler) ShortenJSON(w http.ResponseWriter, r *http.Request) {
 // shortenJSONError is a helper function that sets the appropriate response
 // headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
+	logger := h.logger.SkipCaller(1)
 	if code >= 500 {
-		h.logger.Error(message, zap.Error(err), zap.String("loc", caller(2)))
+		logger.Errorf("%s: %s", message, err)
 	} else {
-		h.logger.Info(message, zap.Error(err), zap.String("loc", caller(2)))
+		logger.Infof("%s: %s", message, err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
@@ -154,7 +158,7 @@ func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err er
 		Message: fmt.Sprintf("%s: %s", err, message),
 	})
 	if err != nil {
-		h.logger.Error("failed to encode response", zap.Error(err))
+		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

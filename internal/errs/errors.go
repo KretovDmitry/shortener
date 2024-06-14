@@ -19,3 +19,6 @@ var ErrInvalidRequest = errors.New("invalid request")
 
 // ErrDBNotConnected is returned when the database connection is not established.
 var ErrDBNotConnected = errors.New("database not connected")
+
+// ErrNilDependency indicates unproper initialization.
+var ErrNilDependency = errors.New("nil dependency")

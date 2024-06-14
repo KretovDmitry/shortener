@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,9 +71,9 @@ func TestNew(t *testing.T) {
 		store db.URLStorage
 	}
 	tests := []struct {
-		name    string
 		args    args
 		want    *Handler
+		name    string
 		wantErr bool
 	}{
 		{
@@ -96,7 +97,7 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := New(tt.args.store, 5)
+			got, err := New(tt.args.store, logger.Get(), 5)
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}
@@ -111,7 +112,7 @@ func TestNew(t *testing.T) {
 
 func getResponseTextPayload(t *testing.T, res *http.Response) string {
 	resBody, err := io.ReadAll(res.Body)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 	require.NoError(t, err)
 	return strings.TrimSpace(string(resBody))
 }

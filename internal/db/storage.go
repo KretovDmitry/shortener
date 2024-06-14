@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 )
 
@@ -31,10 +33,14 @@ type URLStorage interface {
 }
 
 // NewStore creates a new instance of URLStorage based on the configuration.
-func NewStore(ctx context.Context) (URLStorage, error) {
+func NewStore(ctx context.Context, logger logger.Logger) (URLStorage, error) {
+	if logger == nil {
+		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
+	}
+
 	if config.DSN != "" {
 		// create a new postgres store
-		store, err := NewPostgresStore(ctx, config.DSN)
+		store, err := NewPostgresStore(ctx, config.DSN, logger)
 		if err != nil {
 			return nil, fmt.Errorf("new postgres store: %w", err)
 		}

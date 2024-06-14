@@ -9,18 +9,19 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenText(t *testing.T) {
+func TestPostShortenText(t *testing.T) {
 	path := "/"
 
 	type want struct {
-		statusCode int
 		response   string
+		statusCode int
 	}
 
 	tests := []struct {
@@ -175,15 +176,15 @@ func TestShortenText(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler context error")
 
-			handler.ShortenText(w, r)
+			handler.PostShortenText(w, r)
 
 			res := w.Result()
 
 			response := getResponseTextPayload(t, res)
-			res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			// if response contains URL (positive scenarios), take only short URL
 			if strings.HasPrefix(response, "http") {
@@ -206,15 +207,15 @@ func TestShortenText_WithoutUserInContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), 5)
+	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
-	handler.ShortenText(w, r)
+	handler.PostShortenText(w, r)
 
 	res := w.Result()
 
 	response := getResponseTextPayload(t, res)
-	res.Body.Close()
+	require.NoError(t, res.Body.Close(), "failed close body")
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),

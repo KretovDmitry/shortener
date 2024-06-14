@@ -9,19 +9,20 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestHandleShortURLRedirect(t *testing.T) {
+func TestGetRedirect(t *testing.T) {
 	tests := []struct {
+		store          db.URLStorage
+		assertResponse func(res *http.Response)
 		name           string
 		method         string
 		shortURL       string
-		store          db.URLStorage
-		assertResponse func(res *http.Response)
 	}{
 		{
 			name:     "positive test #1",
@@ -32,7 +33,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 				ShortURL:    "TZqSKV4t",
 			}),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 				assert.Equal(t, "https://e.mail.ru/inbox/", res.Header.Get("Location"))
 			},
@@ -46,7 +47,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 				ShortURL:    "YBbxJEcQ",
 			}),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
 				assert.Equal(t, "https://go.dev/", res.Header.Get("Location"))
 			},
@@ -57,7 +58,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "YBbxJEcQ",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				assert.Equal(t,
 					fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPost),
@@ -70,7 +71,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "YBbxJEcQ",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				assert.Equal(t,
 					fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
@@ -83,7 +84,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "YBbxJEcQ",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				assert.Equal(t,
 					fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
@@ -96,7 +97,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "YBbxJEcQ",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				assert.Equal(t,
 					fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
@@ -109,7 +110,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "Too_Long_URL", // > 8 characters
 			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest), resBody)
@@ -121,7 +122,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "short", // < 8 characters
 			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest), resBody)
@@ -133,7 +134,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "O0Il0O", // 0OIl+/ are not used
 			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest), resBody)
@@ -145,7 +146,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "2x1xx1x2",
 			store:    db.NewInMemoryStore(),
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, fmt.Sprintf("%s: no such URL", errs.ErrNotFound), resBody)
@@ -157,7 +158,7 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			shortURL: "2x1xx1x2",
 			store:    &brokenStore{},
 			assertResponse: func(res *http.Response) {
-				defer res.Body.Close()
+				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
 				resBody := getResponseTextPayload(t, res)
 				assert.Equal(t, fmt.Sprintf("%s: failed to retrieve url", errIntentionallyNotWorkingMethod), resBody)
@@ -178,15 +179,15 @@ func TestHandleShortURLRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			handler, err := New(tt.store, 5)
+			handler, err := New(tt.store, logger.Get(), 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler
-			handler.Redirect(w, r)
+			handler.GetRedirect(w, r)
 
 			// get recorded data
 			res := w.Result()
-			defer res.Body.Close()
+			require.NoError(t, res.Body.Close(), "failed close body")
 
 			// assert wanted data
 			assert.Equal(t, textPlain, res.Header.Get(contentType))

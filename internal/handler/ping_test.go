@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,8 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type connectedStore struct {
+	*db.InMemoryStore
+}
+
+func (s *connectedStore) Ping(context.Context) error {
+	return nil
+}
+
 func TestGetPingDB(t *testing.T) {
-	path := "/"
+	path := "/ping"
 
 	type want struct {
 		response   string
@@ -22,100 +31,97 @@ func TestGetPingDB(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		method string
-		store  db.URLStorage
-		want   want
+		name  string
+		store db.URLStorage
+		want  want
 	}{
 		{
-			name:   "connected test",
-			method: http.MethodGet,
-			store:  &connectedStore{},
+			name:  "connected test",
+			store: &connectedStore{},
 			want: want{
 				statusCode: http.StatusOK,
 				response:   "",
 			},
 		},
 		{
-			name:   "invalid method: method post",
-			method: http.MethodPost,
-			store:  db.NewInMemoryStore(),
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPost),
-			},
-		},
-		{
-			name:   "invalid method: method put",
-			method: http.MethodPut,
-			store:  db.NewInMemoryStore(),
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
-			},
-		},
-		{
-			name:   "invalid method: method patch",
-			method: http.MethodPatch,
-			store:  db.NewInMemoryStore(),
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
-			},
-		},
-		{
-			name:   "invalid method: method delete",
-			method: http.MethodDelete,
-			store:  db.NewInMemoryStore(),
-			want: want{
-				statusCode: http.StatusBadRequest,
-				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
-			},
-		},
-		{
-			name:   "DB not connected",
-			method: http.MethodGet,
-			store:  db.NewInMemoryStore(),
+			name:  "DB not connected",
+			store: db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("%s: DB not connected", errs.ErrDBNotConnected),
+				response: fmt.Sprintf(
+					"%s: DB not connected", errs.ErrDBNotConnected,
+				),
 			},
 		},
 		{
-			name:   "connection error",
-			method: http.MethodGet,
-			store:  &brokenStore{},
+			name:  "connection error",
+			store: &brokenStore{},
 			want: want{
 				statusCode: http.StatusInternalServerError,
-				response:   fmt.Sprintf("%s: connection error", errIntentionallyNotWorkingMethod),
+				response: fmt.Sprintf(
+					"%s: connection error", errIntentionallyNotWorkingMethod,
+				),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// create request with the method, content type and the payload being tested
-			r := httptest.NewRequest(tt.method, path, http.NoBody)
+			r := httptest.NewRequest(http.MethodGet, path, http.NoBody)
 
-			// response recorder
 			w := httptest.NewRecorder()
 
-			// context with mock store, stop test if failed to init context
 			handler, err := New(tt.store, logger.Get(), 5)
-			require.NoError(t, err, "new handler context error")
+			require.NoError(t, err, "failed to init new handler")
 
-			// call the handler
 			handler.GetPingDB(w, r)
 
-			// get recorded data
 			res := w.Result()
 
-			// read the response and close the body; stop test if failed to read body
 			response := getResponseTextPayload(t, res)
 			require.NoError(t, res.Body.Close(), "failed close body")
 
-			// assert wanted data
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			assert.Equal(t, tt.want.response, response)
+		})
+	}
+}
+
+func TestGetPing_Method(t *testing.T) {
+	path := "/ping"
+
+	tests := []struct {
+		name   string
+		method string
+	}{
+		{"invalid method: put", http.MethodPut},
+		{"invalid method: head", http.MethodHead},
+		{"invalid method: post", http.MethodPost},
+		{"invalid method: patch", http.MethodPatch},
+		{"invalid method: trace", http.MethodTrace},
+		{"invalid method: delete", http.MethodDelete},
+		{"invalid method: connect", http.MethodConnect},
+		{"invalid method: options", http.MethodOptions},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, path, http.NoBody)
+
+			w := httptest.NewRecorder()
+
+			handler, err := New(&connectedStore{}, logger.Get(), 5)
+			require.NoError(t, err, "failed to init new handler")
+
+			handler.GetPingDB(w, r)
+
+			res := w.Result()
+
+			response := getResponseTextPayload(t, res)
+			require.NoError(t, res.Body.Close(), "failed close body")
+
+			assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+			assert.Equal(t, textPlain, res.Header.Get(contentType))
+			assert.Equal(t, fmt.Sprintf("%s: %s",
+				errs.ErrInvalidRequest, tt.method), response)
 		})
 	}
 }

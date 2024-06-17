@@ -43,7 +43,7 @@ func TestPostShortenJSON(t *testing.T) {
 			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
-				response:   "TZqSKV4t",
+				response:   "TZqSKV4tcyE",
 			},
 			wantErr: false,
 		},
@@ -55,7 +55,7 @@ func TestPostShortenJSON(t *testing.T) {
 			store:       db.NewInMemoryStore(),
 			want: want{
 				statusCode: http.StatusCreated,
-				response:   "YBbxJEcQ",
+				response:   "YBbxJEcQ9vq",
 			},
 			wantErr: false,
 		},
@@ -66,11 +66,11 @@ func TestPostShortenJSON(t *testing.T) {
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
 			store: initMockStore(&models.URL{
 				OriginalURL: "https://go.dev/",
-				ShortURL:    "YBbxJEcQ",
+				ShortURL:    "YBbxJEcQ9vq",
 			}),
 			want: want{
 				statusCode: http.StatusConflict,
-				response:   "YBbxJEcQ",
+				response:   "YBbxJEcQ9vq",
 			},
 			wantErr: false,
 		},

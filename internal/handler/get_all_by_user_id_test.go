@@ -24,10 +24,14 @@ func TestGetAllByUserID_Method(t *testing.T) {
 		name   string
 		method string
 	}{
-		{"invalid method: method put", http.MethodPut},
-		{"invalid method: method post", http.MethodPost},
-		{"invalid method: method patch", http.MethodPatch},
-		{"invalid method: method delete", http.MethodDelete},
+		{"invalid method: put", http.MethodPut},
+		{"invalid method: head", http.MethodHead},
+		{"invalid method: post", http.MethodPost},
+		{"invalid method: patch", http.MethodPatch},
+		{"invalid method: trace", http.MethodTrace},
+		{"invalid method: delete", http.MethodDelete},
+		{"invalid method: connect", http.MethodConnect},
+		{"invalid method: options", http.MethodOptions},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,7 +53,8 @@ func TestGetAllByUserID_Method(t *testing.T) {
 
 			assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 			assert.Equal(t, textPlain, res.Header.Get(contentType))
-			assert.Equal(t, fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, tt.method), response)
+			assert.Equal(t, fmt.Sprintf("%s: %s",
+				errs.ErrInvalidRequest, tt.method), response)
 		})
 	}
 }
@@ -71,7 +76,8 @@ func TestGetAllByUserID_WithoutUserInContext(t *testing.T) {
 	response := getResponseTextPayload(t, res)
 	require.NoError(t, res.Body.Close(), "failed close body")
 
-	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "status code mismatch")
+	assert.Equal(t, http.StatusUnauthorized, res.StatusCode,
+		"status code mismatch")
 	assert.Equal(t, fmt.Sprintf("%s: no user found", errs.ErrUnauthorized),
 		response, "response message mismatch")
 }
@@ -102,33 +108,35 @@ func TestGetAllByUserID_NoData(t *testing.T) {
 
 func TestGetAllByUserID_Data(t *testing.T) {
 	path := "/api/user/urls"
+	userID := "test"
+	data := []*models.URL{
+		{
+			ID:          "some id 1",
+			OriginalURL: "https://practicum.yandex.ru",
+			ShortURL:    "TZqSKV4tcyE",
+			UserID:      userID,
+		},
+		{
+			ID:          "some id 2",
+			OriginalURL: "https://go.dev",
+			ShortURL:    "YBbxJEcQ9vq",
+			UserID:      userID,
+		},
+	}
 
 	r := httptest.NewRequest(http.MethodGet, path, http.NoBody)
 	r.Header.Set(contentType, applicationJSON)
 
-	r = r.WithContext(user.NewContext(r.Context(), &user.User{ID: "test"}))
+	r = r.WithContext(user.NewContext(r.Context(), &user.User{ID: userID}))
 
 	w := httptest.NewRecorder()
 
-	mock := db.NewInMemoryStore()
+	mocks := db.NewInMemoryStore()
 
-	err := mock.SaveAll(context.TODO(), []*models.URL{
-		{
-			ID:          "some id 1",
-			OriginalURL: "https://e.mail.ru/inbox/",
-			ShortURL:    "TZqSKV4t",
-			UserID:      "test",
-		},
-		{
-			ID:          "some id 2",
-			OriginalURL: "https://go.dev/",
-			ShortURL:    "YBbxJEcQ",
-			UserID:      "test",
-		},
-	})
+	err := mocks.SaveAll(context.TODO(), data)
 	require.NoError(t, err, "save failed")
 
-	handler, err := New(mock, logger.Get(), 5)
+	handler, err := New(mocks, logger.Get(), 5)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -141,15 +149,18 @@ func TestGetAllByUserID_Data(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, applicationJSON, res.Header.Get(contentType))
 
-	all, err := mock.GetAllByUserID(context.TODO(), "test")
-	require.NoError(t, err, "get all")
+	all, err := mocks.GetAllByUserID(context.TODO(), "test")
+	require.NoError(t, err, "in memory store: get all failed")
 
 	assert.Equal(t, len(all), len(response), "response mismatch")
 }
 
-func decodeAllByUserIDResponsePayload(t *testing.T, r *http.Response) (res []getAllByUserIDResponsePayload) {
+func decodeAllByUserIDResponsePayload(
+	t *testing.T, r *http.Response,
+) []getAllByUserIDResponsePayload {
+	res := make([]getAllByUserIDResponsePayload, 0)
 	err := json.NewDecoder(r.Body).Decode(&res)
 	require.NoError(t, err, "failed to decode response JSON")
-	require.NoError(t, r.Body.Close(), "failed close body")
-	return
+	require.NoError(t, r.Body.Close(), "failed to close body")
+	return res
 }

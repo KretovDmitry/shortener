@@ -28,3 +28,6 @@ vendor/
 
 # File storage
 short-url-db.json
+
+# pid file
+.pid

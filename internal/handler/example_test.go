@@ -34,5 +34,5 @@ func Example() {
 		fmt.Println(string(b[bytes.LastIndex(b, []byte("/"))+1:]))
 	}
 
-	// Output: YBbxJEcQ
+	// Output: YBbxJEcQ9vq
 }

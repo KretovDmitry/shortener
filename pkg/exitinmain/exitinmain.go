@@ -3,12 +3,16 @@
 package exitinmain
 
 import (
+	"errors"
 	"go/ast"
+	"log"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
 )
+
+// nogochecknoglobals
 
 // Analyzer is a go analysis package analyzer implementation.
 var Analyzer = &analysis.Analyzer{
@@ -22,7 +26,12 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	// Get the inspector. This will not panic because inspect.Analyzer is part
 	// of `Requires`. go/analysis will populate the `pass.ResultOf` map with
 	// the prerequisite analyzers.
-	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	inspect, ok := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	if !ok {
+		message := "failed to obtain the prerequisite inspector"
+		log.Println(message)
+		return nil, errors.New(message)
+	}
 
 	// The inspector has a `filter` feature that enables type-based filtering
 	// The anonymous function will be only called for the ast nodes whose type

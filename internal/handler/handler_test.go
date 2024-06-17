@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -23,7 +24,7 @@ const (
 
 var errIntentionallyNotWorkingMethod = errors.New("intentionally not working method")
 
-// simulating errors with storage operations
+// simulating errors with storage operations.
 type brokenStore struct{}
 
 var _ db.URLStorage = (*brokenStore)(nil)
@@ -40,24 +41,16 @@ func (s *brokenStore) Get(context.Context, models.ShortURL) (*models.URL, error)
 	return nil, errIntentionallyNotWorkingMethod
 }
 
-func (s *brokenStore) GetAllByUserID(_ context.Context, userID string) ([]*models.URL, error) {
+func (s *brokenStore) GetAllByUserID(context.Context, string) ([]*models.URL, error) {
 	return nil, errIntentionallyNotWorkingMethod
 }
 
-func (s *brokenStore) DeleteURLs(_ context.Context, urls ...*models.URL) error {
+func (s *brokenStore) DeleteURLs(context.Context, ...*models.URL) error {
 	return errIntentionallyNotWorkingMethod
 }
 
 func (s *brokenStore) Ping(context.Context) error {
 	return errIntentionallyNotWorkingMethod
-}
-
-type connectedStore struct {
-	*db.InMemoryStore
-}
-
-func (s *connectedStore) Ping(context.Context) error {
-	return nil
 }
 
 func initMockStore(u *models.URL) *db.InMemoryStore {
@@ -117,10 +110,28 @@ func getResponseTextPayload(t *testing.T, res *http.Response) string {
 	return strings.TrimSpace(string(resBody))
 }
 
-func getShortURL(s string) (res string) {
+func getShortURL(s string) string {
+	var res string
 	if strings.HasPrefix(s, "http") {
 		slice := strings.Split(s, "/")
 		res = slice[len(slice)-1]
 	}
-	return
+	return res
+}
+
+func TestIsTextPlainContentType(t *testing.T) {
+	testcases := []struct {
+		contentType string
+		expected    bool
+	}{
+		{"text/plain", true},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.contentType, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+			r.Header.Set(contentType, tc.contentType)
+			assert.Equal(t, tc.expected, isTextPlainContentType(r))
+		})
+	}
 }

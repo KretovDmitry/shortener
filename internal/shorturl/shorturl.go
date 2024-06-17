@@ -3,7 +3,6 @@ package shorturl
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/itchyny/base58-go"
 )
@@ -17,6 +16,5 @@ func Generate(s string) string {
 	urlHashBytes := sha256.Sum(nil)
 	generatedNumber := binary.BigEndian.Uint64(urlHashBytes)
 	encodedBytes := base58.BitcoinEncoding.EncodeUint64(generatedNumber)
-	fmt.Println(string(encodedBytes))
 	return string(encodedBytes)
 }

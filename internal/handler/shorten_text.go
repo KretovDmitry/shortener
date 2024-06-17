@@ -26,7 +26,7 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check the content type.
-	if r.Header.Get("Content-Encoding") == "" && !h.IsTextPlainContentType(r) {
+	if r.Header.Get("Content-Encoding") == "" && !isTextPlainContentType(r) {
 		h.textError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}

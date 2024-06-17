@@ -187,7 +187,7 @@ func (h *Handler) IsApplicationJSONContentType(r *http.Request) bool {
 
 // IsTextPlainContentType returns true if the content type of the
 // HTTP request is text/plain.
-func (h *Handler) IsTextPlainContentType(r *http.Request) bool {
+func isTextPlainContentType(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
 	if i := strings.Index(contentType, ";"); i > -1 {

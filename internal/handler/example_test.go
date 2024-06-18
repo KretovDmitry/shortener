@@ -18,7 +18,7 @@ func Example() {
 
 	// Prepare request and recorder.
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://go.dev/"))
-	r.Header.Set(contentType, textPlain)
+	r.Header.Set("Content-Type", "text/plain")
 	r = r.WithContext(user.NewContext(r.Context(), &user.User{ID: "test"}))
 	w := httptest.NewRecorder()
 

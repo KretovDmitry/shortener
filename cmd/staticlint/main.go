@@ -60,7 +60,7 @@ const Config = `config.json`
 
 // ConfigData describes configuration file structure.
 type ConfigData struct {
-	Staticcheck []string
+	Staticcheck []string `json:"staticcheck"`
 }
 
 func main() {

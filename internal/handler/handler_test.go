@@ -53,6 +53,12 @@ func (s *brokenStore) Ping(context.Context) error {
 	return errIntentionallyNotWorkingMethod
 }
 
+type brokenReader struct{}
+
+func (br *brokenReader) Read(_ []byte) (int, error) {
+	return 0, errIntentionallyNotWorkingMethod
+}
+
 func initMockStore(u *models.URL) *db.InMemoryStore {
 	inMem := db.NewInMemoryStore()
 	_ = inMem.Save(context.TODO(), u)
@@ -103,6 +109,27 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestIsTextPlainContentType(t *testing.T) {
+	testcases := []struct {
+		contentType string
+		expected    bool
+	}{
+		{"text/plain", true},
+		{"text/plain; charset=utf-8", true},
+		{"text/plain; charset=utf-16", true},
+		{"application/json; charset=utf-8", false},
+		{"application/json; charset=utf-16", false},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.contentType, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+			r.Header.Set(contentType, tc.contentType)
+			assert.Equal(t, tc.expected, isTextPlainContentType(r))
+		})
+	}
+}
+
 func getResponseTextPayload(t *testing.T, res *http.Response) string {
 	resBody, err := io.ReadAll(res.Body)
 	require.NoError(t, res.Body.Close(), "failed close body")
@@ -117,21 +144,4 @@ func getShortURL(s string) string {
 		res = slice[len(slice)-1]
 	}
 	return res
-}
-
-func TestIsTextPlainContentType(t *testing.T) {
-	testcases := []struct {
-		contentType string
-		expected    bool
-	}{
-		{"text/plain", true},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.contentType, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
-			r.Header.Set(contentType, tc.contentType)
-			assert.Equal(t, tc.expected, isTextPlainContentType(r))
-		})
-	}
 }

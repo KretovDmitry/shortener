@@ -71,6 +71,14 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	// Create a new record with the generated short URL, original URL, and user ID.
 	newRecord := models.NewRecord(generatedShortURL, originalURL, user.ID)
 
+	// Save the record to the database.
+	storeErr := h.store.Save(r.Context(), newRecord)
+	if storeErr != nil && !errors.Is(storeErr, errs.ErrConflict) {
+		h.textError(w, "failed to save to database",
+			storeErr, http.StatusInternalServerError)
+		return
+	}
+
 	// Build the JWT authentication token.
 	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
 	if err != nil {
@@ -78,17 +86,10 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save the record to the database.
-	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, errs.ErrConflict) {
-		h.textError(w, "failed to save to database", err, http.StatusInternalServerError)
-		return
-	}
-
 	// Set the response headers and status code.
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	switch {
-	case errors.Is(err, errs.ErrConflict):
+	case errors.Is(storeErr, errs.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)

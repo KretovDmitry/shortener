@@ -159,7 +159,6 @@ var (
 // Flags take precedence over the default values.
 // Environment variables have the highest priority.
 func ParseFlags() error {
-
 	// flags take precedence over the default values
 	flag.Var(AddrToRun, "a", "Net address host:port to run server")
 	flag.Var(AddrToReturn, "b", "Net address host:port to return short URLs")

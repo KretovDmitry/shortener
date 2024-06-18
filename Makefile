@@ -69,3 +69,11 @@ lint-custom: ## run custom static analysis tool
 lint-ci: ## run golangchi lint on all Go packages
 	docker run -t --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.59.1 golangci-lint run -v
 
+
+.PHONY: mock
+mock: ## generate all mocks for the project with mockgen
+	make mock-store
+
+.PHONY: mock-store
+mock-store: ## generate mock store with mockgen
+	mockgen -destination=mocks/mock_store.go -package=mocks github.com/KretovDmitry/shortener/internal/db URLStorage

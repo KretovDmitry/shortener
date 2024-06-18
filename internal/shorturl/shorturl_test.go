@@ -42,8 +42,8 @@ func BenchmarkGenerateLen1000(b *testing.B) {
 	}
 }
 
-func randString(n int) string {
-	b := make([]byte, n)
+func randString(length uint) string {
+	b := make([]byte, length)
 	ln := len(alphabet)
 	for i := range b {
 		b[i] = alphabet[rand.Intn(ln)]

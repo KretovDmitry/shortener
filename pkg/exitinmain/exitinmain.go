@@ -12,8 +12,6 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-// nogochecknoglobals
-
 // Analyzer is a go analysis package analyzer implementation.
 var Analyzer = &analysis.Analyzer{
 	Name:     "exitinmain",

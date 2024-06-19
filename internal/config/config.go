@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -151,6 +152,7 @@ var (
 	JWT             = Duration(time.Hour * 3)
 	MigrationDir    string
 	ShutdownTimeout = 30 * time.Second
+	TLSEnabled      bool
 )
 
 // ParseFlags parses the command line flags and sets the corresponding values.
@@ -166,8 +168,9 @@ func ParseFlags() error {
 	flag.Var(&JWT, "j", `JWT lifetime in form of time.Duration: such as "2h45m"`)
 	flag.StringVar(&DSN, "d", "", "Data source name in form postgres URL or DSN string")
 	flag.StringVar(&LogLevel, "l", "info", "Log level")
-	flag.StringVar(&Secret, "s", "test", "Secret key for JWT")
+	flag.StringVar(&Secret, "k", "test", "Secret key for JWT")
 	flag.StringVar(&MigrationDir, "m", ".", "Path to migration directory")
+	flag.BoolVar(&TLSEnabled, "s", false, "Enable HTTPS")
 	flag.Parse()
 
 	// ENV variables have the highest priority
@@ -195,6 +198,32 @@ func ParseFlags() error {
 
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
 		LogLevel = envLogLevel
+	}
+
+	if envTLSEnabled := os.Getenv("ENABLE_HTTPS"); envTLSEnabled != "" {
+		trueValues := []string{
+			"true", "1", "t", "T", "TRUE", "True",
+		}
+		falseValues := []string{
+			"false", "0", "f", "F", "FALSE", "False",
+		}
+		switch {
+		case slices.Contains(trueValues, envTLSEnabled):
+			TLSEnabled = true
+		case slices.Contains(falseValues, envTLSEnabled):
+			TLSEnabled = false
+		default:
+			msg := fmt.Sprintf(
+				"invalid ENABLE_HTTPS environment variable: %s; "+
+					"need boolean value in form:\n\t"+
+					"true: \"%s\"\n\t"+
+					"false: \"%s\"",
+				envTLSEnabled,
+				strings.Join(trueValues, "\", \""),
+				strings.Join(falseValues, "\", \""),
+			)
+			return errors.New(msg)
+		}
 	}
 
 	return nil

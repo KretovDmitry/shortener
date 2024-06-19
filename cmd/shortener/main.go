@@ -19,6 +19,7 @@ import (
 	"github.com/KretovDmitry/shortener/internal/logger"
 	_ "github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -82,8 +83,23 @@ func run() error {
 
 	logger.Infof("Server has started: %s", config.AddrToRun)
 	logger.Infof("Return address: %s", config.AddrToReturn)
-	if err = hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("run server failed: %w", err)
+	switch config.TLSEnabled {
+	case true:
+		cm := &autocert.Manager{
+			Cache:  autocert.DirCache("cache/certs"),
+			Prompt: autocert.AcceptTOS,
+		}
+		hs.TLSConfig = cm.TLSConfig()
+		logger.Info("The server is running over the SSL protocol")
+		if err = hs.ListenAndServeTLS("", ""); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("run server failed: %w", err)
+		}
+	default:
+		if err = hs.ListenAndServe(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("run server failed: %w", err)
+		}
 	}
 
 	// Wait for server context to be stopped

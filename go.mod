@@ -13,6 +13,7 @@ require (
 	github.com/kisielk/errcheck v1.7.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/mock v0.4.0
+	golang.org/x/crypto v0.24.0
 	golang.org/x/tools v0.22.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	honnef.co/go/tools v0.4.7
@@ -38,9 +39,9 @@ require (
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/ugorji/go/codec v1.2.6 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20221208152030-732eee02a75a // indirect
 	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect

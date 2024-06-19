@@ -16,8 +16,8 @@ func upURL(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS public.url (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			short_url VARCHAR(8) NOT NULL,
-			original_url VARCHAR(255) NOT NULL
+			short_url VARCHAR(255) NOT NULL,
+			original_url TEXT NOT NULL
 		);
 	`)
 	if err != nil {

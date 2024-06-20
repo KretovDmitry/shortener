@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
@@ -191,7 +192,9 @@ func TestPostShortenJSON(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(tt.store, logger.Get(), 5)
+			l, _ := logger.NewForTest()
+
+			handler, err := New(tt.store, &config.Config{}, l, 5)
 			require.NoError(t, err, "new handler context error")
 
 			handler.PostShortenJSON(w, r)
@@ -223,7 +226,9 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
+	l, _ := logger.NewForTest()
+
+	handler, err := New(db.NewInMemoryStore(), &config.Config{}, l, 5)
 	require.NoError(t, err, "new handler error")
 
 	handler.PostShortenJSON(w, r)

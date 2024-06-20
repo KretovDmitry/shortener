@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
@@ -155,7 +156,9 @@ func TestGetRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			handler, err := New(tt.store, logger.Get(), 5)
+			l, _ := logger.NewForTest()
+
+			handler, err := New(tt.store, &config.Config{}, l, 5)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

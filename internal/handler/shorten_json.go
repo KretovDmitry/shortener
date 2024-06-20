@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -97,7 +96,8 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
 
 	// Build the JWT authentication token.
-	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
+	authToken, err := jwt.BuildJWTString(user.ID,
+		h.config.JWT.SigningKey, time.Duration(h.config.JWT.Expiration))
 	if err != nil {
 		h.shortenJSONError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
@@ -123,7 +123,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(time.Duration(config.JWT)),
+		Expires:  time.Now().Add(time.Duration(h.config.JWT.Expiration)),
 		HttpOnly: true,
 	})
 

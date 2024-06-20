@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/google/uuid"
+	sqldblogger "github.com/simukti/sqldb-logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -23,6 +25,9 @@ type Logger interface {
 	// With returns a logger based off the root logger
 	// and decorates it with the given context and arguments.
 	With(ctx context.Context, args ...interface{}) Logger
+
+	// Log implements sqldblogger.Logger interface.
+	Log(ctx context.Context, level sqldblogger.Level, msg string, data map[string]interface{})
 
 	// Debug uses fmt.Sprint to construct and log a message at DEBUG level.
 	Debug(args ...interface{})
@@ -62,19 +67,19 @@ const (
 )
 
 // Get creates a new logger using the default configuration.
-func Get() *Log {
+func New(config *config.Config) *Log {
 	sync.OnceFunc(func() {
 		stdout := zapcore.AddSync(os.Stdout)
 
 		file := zapcore.AddSync(&lumberjack.Logger{
-			Filename:   "var/log/app.log",
-			MaxSize:    5, // MB
-			MaxBackups: 14,
-			MaxAge:     14, // days
+			Filename:   config.Logger.Path,
+			MaxSize:    config.Logger.MaxSizeMB,
+			MaxBackups: config.Logger.MaxBackups,
+			MaxAge:     config.Logger.MaxAgeDays,
 			Compress:   true,
 		})
 
-		configLevel, err := zapcore.ParseLevel(config.LogLevel)
+		configLevel, err := zapcore.ParseLevel(config.Logger.Level)
 		if err != nil {
 			log.Println(
 				fmt.Errorf("invalid level, defaulting to INFO: %w", err),
@@ -141,6 +146,36 @@ func NewForTest() (Logger, *observer.ObservedLogs) {
 	return NewWithZap(zap.New(core)), recorded
 }
 
+// Log implements sqldblogger.Logger.
+func (l *Log) Log(_ context.Context, level sqldblogger.Level, msg string, data map[string]interface{}) {
+	fields := make([]zap.Field, len(data))
+	i := 0
+
+	for k, v := range data {
+		if k == "query" {
+			if query, ok := v.(string); ok {
+				fields[i] = zap.String(k, formatQuery(query))
+				i++
+				continue
+			}
+		}
+		fields[i] = zap.Any(k, v)
+		i++
+	}
+
+	switch level {
+	case sqldblogger.LevelError:
+		l.Desugar().Error(msg, fields...)
+	case sqldblogger.LevelInfo:
+		l.Desugar().Info(msg, fields...)
+	case sqldblogger.LevelDebug:
+		l.Desugar().Debug(msg, fields...)
+	case sqldblogger.LevelTrace:
+		// trace will use zap debug
+		l.Desugar().Debug(msg, fields...)
+	}
+}
+
 // With returns a logger based off the root logger
 // and decorates it with the given context and arguments.
 //
@@ -187,4 +222,9 @@ func getCorrelationID(req *http.Request) string {
 // getRequestID extracts the correlation ID from the HTTP request.
 func getRequestID(req *http.Request) string {
 	return req.Header.Get("X-Request-ID")
+}
+
+// formatQuery removes tabs and replaces newlines with spaces in the given query string.
+func formatQuery(q string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(q, "\t", ""), "\n", " ")
 }

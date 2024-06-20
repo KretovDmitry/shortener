@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -19,6 +20,8 @@ import (
 	"github.com/KretovDmitry/shortener/internal/logger"
 	_ "github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
+	"github.com/pressly/goose"
+	sqldblogger "github.com/simukti/sqldb-logger"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -40,11 +43,45 @@ func run() error {
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 	defer serverStopCtx()
 
-	logger := logger.Get()
+	// Load application configurations.
+	cfg := config.MustLoad()
 
-	err := config.ParseFlags()
-	if err != nil {
-		return fmt.Errorf("parse flags: %w", err)
+	// Create root logger tagged with server version.
+	logger := logger.New(cfg).With(serverCtx, "version", buildVersion)
+	defer func() {
+		_ = logger.Sync()
+	}()
+
+	var store db.URLStorage
+
+	if cfg.DSN != "" {
+		// Connect to the postgres.
+		db, err := sql.Open("pgx", cfg.DSN)
+		if err != nil {
+			return fmt.Errorf("failed to open the database: %w", err)
+		}
+
+		// Log every query to the database.
+		db = sqldblogger.OpenDriver(cfg.DSN, db.Driver(), logger)
+
+		// Check connectivity and DSN correctness.
+		if err = db.Ping(); err != nil {
+			return fmt.Errorf("failed to connect to the database: %w", err)
+		}
+
+		// Close connection.
+		defer func() {
+			if err = db.Close(); err != nil {
+				logger.Error(err)
+			}
+		}()
+
+		// Up all migrations for github tests.
+		err = goose.Up(db, cfg.Migrations)
+		if err != nil {
+			return fmt.Errorf("goose: failed to migrate DB: %v", err)
+		}
+
 	}
 
 	store, err := db.NewStore(serverCtx, logger)
@@ -52,15 +89,17 @@ func run() error {
 		return fmt.Errorf("new store: %w", err)
 	}
 
-	handler, err := handler.New(store, logger, 5)
+	handler, err := handler.New(store, cfg, logger, 5)
 	if err != nil {
 		return fmt.Errorf("new handler: %w", err)
 	}
 	defer handler.Stop()
 
 	hs := &http.Server{
-		Addr:    config.AddrToRun.String(),
-		Handler: handler.Register(chi.NewRouter(), logger),
+		Addr:              cfg.HTTPServer.RunAddress.String(),
+		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
+		Handler:           handler.Register(chi.NewRouter(), logger),
 	}
 
 	// Graceful shutdown.
@@ -73,7 +112,7 @@ func run() error {
 
 		logger.With(serverCtx, "signal", signal.String()).
 			Infof("Shutting down server with %s timeout",
-				config.ShutdownTimeout)
+				cfg.HTTPServer.ShutdownTimeout)
 
 		if err = hs.Shutdown(serverCtx); err != nil {
 			logger.Errorf("graceful shutdown failed: %s", err)
@@ -81,9 +120,9 @@ func run() error {
 		serverStopCtx()
 	}()
 
-	logger.Infof("Server has started: %s", config.AddrToRun)
-	logger.Infof("Return address: %s", config.AddrToReturn)
-	switch config.TLSEnabled {
+	logger.Infof("Server has started: %s", cfg.HTTPServer.RunAddress)
+	logger.Infof("Return address: %s", cfg.HTTPServer.ReturnAddress)
+	switch cfg.TLSEnabled {
 	case true:
 		cm := &autocert.Manager{
 			Cache:  autocert.DirCache("cache/certs"),
@@ -105,7 +144,7 @@ func run() error {
 	// Wait for server context to be stopped
 	select {
 	case <-serverCtx.Done():
-	case <-time.After(config.ShutdownTimeout):
+	case <-time.After(cfg.HTTPServer.ShutdownTimeout):
 		return errors.New("graceful shutdown timed out.. forcing exit")
 	}
 

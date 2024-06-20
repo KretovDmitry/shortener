@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -96,7 +97,8 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := New(tt.args.store, logger.Get(), 5)
+			l, _ := logger.NewForTest()
+			got, err := New(tt.args.store, &config.Config{}, l, 5)
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}

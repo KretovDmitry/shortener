@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -80,7 +79,8 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the JWT authentication token.
-	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
+	authToken, err := jwt.BuildJWTString(user.ID,
+		h.config.JWT.SigningKey, time.Duration(h.config.JWT.Expiration))
 	if err != nil {
 		h.textError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
@@ -99,12 +99,12 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(time.Duration(config.JWT)),
+		Expires:  time.Now().Add(time.Duration(h.config.JWT.Expiration)),
 		HttpOnly: true,
 	})
 
 	// Write the response body.
-	_, err = fmt.Fprintf(w, "http://%s/%s", config.AddrToReturn, generatedShortURL)
+	_, err = fmt.Fprintf(w, "http://%s/%s", h.config.HTTPServer.ReturnAddress, generatedShortURL)
 	if err != nil {
 		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"testing"
-	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/stretchr/testify/require"
@@ -45,29 +44,6 @@ func TestNetAddress_SetInvalid(t *testing.T) {
 	}
 }
 
-func ExampleDuration_Set() {
-	d := new(config.Duration)
-
-	err := d.Set("2h45m")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(d.String()) // Output: 2h45m0s
-}
-
-func ExampleDuration_String() {
-	d := config.Duration(time.Hour * 3)
-	fmt.Println(d.String()) // Output: 3h0m0s
-}
-
-func TestDuration_SetInvalid(t *testing.T) {
-	d := new(config.Duration)
-
-	err := d.Set("invalid")
-	require.Error(t, err, "invalid duration produces no error")
-}
-
 func ExampleFileStorage_Set_noDefault() {
 	fs := config.NewFileStorage()
 
@@ -76,7 +52,7 @@ func ExampleFileStorage_Set_noDefault() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(fs.String(), fs.WriteRequired())
+	fmt.Println(fs.String(), fs.WriteRequired)
 	// Output: path/to/storage true
 }
 
@@ -88,7 +64,7 @@ func ExampleFileStorage_Set_default() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(fs.String(), fs.WriteRequired())
+	fmt.Println(fs.String(), fs.WriteRequired)
 	// Output: /tmp/short-url-db.json false
 }
 
@@ -100,6 +76,6 @@ func TestFileStorage_Path(t *testing.T) {
 	err := fs.Set(path)
 	require.NoError(t, err)
 
-	require.Equal(t, path, fs.Path())
-	require.True(t, fs.WriteRequired())
+	require.Equal(t, path, fs.Path)
+	require.True(t, fs.WriteRequired)
 }

@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +72,9 @@ func TestGetPingDB(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(tt.store, logger.Get(), 5)
+			l, _ := logger.NewForTest()
+
+			handler, err := New(tt.store, &config.Config{}, l, 5)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.GetPingDB(w, r)
@@ -108,7 +112,9 @@ func TestGetPing_Method(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(&connectedStore{}, logger.Get(), 5)
+			l, _ := logger.NewForTest()
+
+			handler, err := New(memstore.NewURLRepository(), &config.Config{}, l, 5)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.GetPingDB(w, r)

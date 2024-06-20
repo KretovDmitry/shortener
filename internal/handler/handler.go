@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/repository"
 	"github.com/KretovDmitry/shortener/pkg/accesslog"
 	"github.com/go-chi/chi/v5"
 	"github.com/nanmu42/gzip"
@@ -23,7 +23,9 @@ import (
 // Handler struct represents the main handler for the application.
 type Handler struct {
 	// store is the database URL storage.
-	store db.URLStorage
+	store repository.URLStorage
+	// application configuration.
+	config *config.Config
 	// logger is the application logger.
 	logger logger.Logger
 	// deleteURLsChan is a channel for sending deleted URLs to be flushed from the database.
@@ -37,16 +39,25 @@ type Handler struct {
 }
 
 // New constructs a new handler, ensuring that the dependencies are valid values.
-func New(store db.URLStorage, logger logger.Logger, bufLen int) (*Handler, error) {
+func New(
+	store repository.URLStorage,
+	config *config.Config,
+	logger logger.Logger,
+	bufLen int,
+) (*Handler, error) {
 	if store == nil {
-		return nil, fmt.Errorf("%w: nil store", errs.ErrNilDependency)
+		return nil, fmt.Errorf("%w: store", errs.ErrNilDependency)
+	}
+	if config == nil {
+		return nil, fmt.Errorf("%w: config", errs.ErrNilDependency)
 	}
 	if logger == nil {
-		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
+		return nil, fmt.Errorf("%w: logger", errs.ErrNilDependency)
 	}
 
 	h := &Handler{
 		store:          store,
+		config:         config,
 		logger:         logger,
 		deleteURLsChan: make(chan *models.URL),
 		wg:             &sync.WaitGroup{},
@@ -79,7 +90,7 @@ func (h *Handler) Stop() {
 	}()
 
 	select {
-	case <-time.After(config.ShutdownTimeout):
+	case <-time.After(h.config.HTTPServer.ShutdownTimeout):
 		h.logger.Error("handler stop: shutdown timeout exceeded")
 	case <-ready:
 		return

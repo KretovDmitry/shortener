@@ -17,6 +17,7 @@ import (
 	"github.com/KretovDmitry/shortener/internal/repository"
 	"github.com/KretovDmitry/shortener/pkg/accesslog"
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
 )
@@ -106,6 +107,7 @@ func (h *Handler) Register(r chi.Router, config *config.Config, logger logger.Lo
 	r.Use(gzip.DefaultHandler().WrapHandler)
 	r.Use(middleware.Unzip(logger))
 	r.Use(middleware.Authorization(config, logger))
+	r.Use(chimiddleware.Recoverer)
 
 	r.Post("/", h.PostShortenText)
 	r.Post("/api/shorten", h.PostShortenJSON)

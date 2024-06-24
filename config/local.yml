@@ -1,5 +1,5 @@
 http_server:
-  server_address: "0.0.0.0:8081"
+  server_address: "0.0.0.0:8080"
   return_address: "0.0.0.0:8080"
   timeout: "5s"
   idle_timeout: "60s"
@@ -13,7 +13,7 @@ logger:
 jwt:
   signing_key: "LxsKJywDL5O5PvgODZhBH12KE6k2yL8E"
   expiration: "24h"
-file_storage_path: "short-url-db.json"
+file_storage_path: "./short-url-db.json"
 migrations_path: "."
 delete_buffer_length: 5
-tls: true
+enable_https: true

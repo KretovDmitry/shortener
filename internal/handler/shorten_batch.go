@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/KretovDmitry/shortener/internal/errs"
@@ -97,7 +98,6 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, p := range payload {
-
 		// check if URL is provided
 		if len(p.OriginalURL) == 0 {
 			h.textError(w, "URL is not provided", errs.ErrInvalidRequest, http.StatusBadRequest)
@@ -113,6 +113,7 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 		// generate short URL
 		shortURL := shorturl.Generate(p.OriginalURL)
 		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, user.ID)
+		shortURL = fmt.Sprintf("http://%s/%s", h.config.HTTPServer.ReturnAddress, shortURL)
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}
 

@@ -54,13 +54,14 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
+	logger.Errorf("%#v", cfg)
+
 	// Single store used by the app. Could be in memory, file storage or
 	// postgres based on configuration.
 	var store repository.URLStorage
 
 	switch cfg.DSN {
 	default:
-		logger.Infof("DSN: %q", cfg.DSN)
 		// Connect to the postgres.
 		db, err := sql.Open("pgx", cfg.DSN)
 		if err != nil {

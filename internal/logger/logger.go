@@ -48,7 +48,7 @@ type Logger interface {
 
 	// SkipCaller allows skip wrappers in the call stack to log actual
 	// caller location.
-	SkipCaller(depth int) Logger
+	SkipCaller(depth int) *Log
 }
 
 // Log is a zap sugared logger wrraper with additional functionality.
@@ -135,13 +135,13 @@ func NewWithZap(l *zap.Logger) *Log {
 
 // SkipCaller allows skip wrappers in the call stack to log actual
 // caller location.
-func (l *Log) SkipCaller(depth int) Logger {
+func (l *Log) SkipCaller(depth int) *Log {
 	return &Log{l.WithOptions(zap.AddCallerSkip(depth))}
 }
 
 // NewForTest returns a new logger and the corresponding observed logs
 // which can be used in unit tests to verify log entries.
-func NewForTest() (Logger, *observer.ObservedLogs) {
+func NewForTest() (*Log, *observer.ObservedLogs) {
 	core, recorded := observer.New(zapcore.InfoLevel)
 	return NewWithZap(zap.New(core)), recorded
 }
@@ -165,14 +165,14 @@ func (l *Log) Log(_ context.Context, level sqldblogger.Level, msg string, data m
 
 	switch level {
 	case sqldblogger.LevelError:
-		l.Desugar().Error(msg, fields...)
+		l.SkipCaller(1).Desugar().Error(msg, fields...)
 	case sqldblogger.LevelInfo:
-		l.Desugar().Info(msg, fields...)
+		l.SkipCaller(1).Desugar().Info(msg, fields...)
 	case sqldblogger.LevelDebug:
-		l.Desugar().Debug(msg, fields...)
+		l.SkipCaller(1).Desugar().Debug(msg, fields...)
 	case sqldblogger.LevelTrace:
 		// trace will use zap debug
-		l.Desugar().Debug(msg, fields...)
+		l.SkipCaller(1).Desugar().Debug(msg, fields...)
 	}
 }
 

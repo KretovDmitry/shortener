@@ -8,13 +8,17 @@ import (
 	"net/http/httptest"
 	"strings"
 
+	"github.com/KretovDmitry/shortener/internal/config"
+	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models/user"
 	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 )
 
 func Example() {
 	// Init handler.
-	handler := &Handler{store: memstore.NewURLRepository()}
+	config := config.NewForTest()
+	logger := logger.New(config)
+	h, _ := New(memstore.NewURLRepository(), config, logger)
 
 	// Prepare request and recorder.
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://go.dev/"))
@@ -23,7 +27,7 @@ func Example() {
 	w := httptest.NewRecorder()
 
 	// Make request.
-	handler.PostShortenText(w, r)
+	h.PostShortenText(w, r)
 
 	// Get results.
 	res := w.Result()

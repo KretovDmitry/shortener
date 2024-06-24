@@ -213,7 +213,7 @@ func TestPostShortenJSON(t *testing.T) {
 				assert.True(t, strings.Contains(response.Message, tt.want.response))
 			case !tt.wantErr:
 				assert.Equal(t, !tt.wantErr, response.Success)
-				assert.Equal(t, tt.want.response, getShortURL(string(response.Result)))
+				assert.Equal(t, tt.want.response, getShortURL(response.Result))
 			}
 		})
 	}
@@ -247,9 +247,10 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 	assert.False(t, response.Success)
 }
 
-func getShortenJSONResponsePayload(t *testing.T, r *http.Response) (res shortenJSONResponsePayload) {
+func getShortenJSONResponsePayload(t *testing.T, r *http.Response) shortenJSONResponsePayload {
+	var res shortenJSONResponsePayload
 	err := json.NewDecoder(r.Body).Decode(&res)
 	require.NoError(t, err, "failed to decode response JSON")
 	require.NoError(t, r.Body.Close(), "failed close body")
-	return
+	return res
 }

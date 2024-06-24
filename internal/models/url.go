@@ -19,11 +19,11 @@ type OriginalURL string
 //   - UserID: the ID of the user who created the URL record.
 //   - IsDeleted: a boolean flag that indicates whether the URL record has been deleted.
 type URL struct {
-	ID          string      `json:"id,omitempty"`
+	ID          string      `json:"id"`
 	ShortURL    ShortURL    `json:"short_url"`
 	OriginalURL OriginalURL `json:"original_url"`
-	UserID      string      `json:"user_id,omitempty"`
-	IsDeleted   bool        `db:"is_deleted"`
+	UserID      string      `json:"user_id"`
+	IsDeleted   bool        `json:"is_deleted" db:"is_deleted"`
 }
 
 // NewRecord is a function that creates a new URL record.

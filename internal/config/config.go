@@ -24,7 +24,11 @@ const (
 	defaultFileName = "short-url-db.json"
 )
 
-var defaultFileStoragePath = path.Join(os.TempDir(), defaultFileName)
+var (
+	defaultFileStoragePath = path.Join(os.TempDir(), defaultFileName)
+	// Default address to start server and return shortened urls with.
+	DefaultAddress = fmt.Sprintf("%s:%s", defaultHost, defaultPort)
+)
 
 type (
 	// Config represents an application configuration.
@@ -38,9 +42,9 @@ type (
 		// Path to migrations.
 		Migrations string `yaml:"migrations_path"`
 		// Path to the file storage.
-		FileStoragePath string `yaml:"file_staroge_path" env:"FILE_STORAGE_PATH"`
+		FileStoragePath string `yaml:"file_storage_path" env:"FILE_STORAGE_PATH"`
 		// TLSEnable determines whether the server will be started in the TLS mode.
-		TLSEnabled TLSEnabled `yaml:"tls"`
+		TLSEnabled TLSEnabled `yaml:"enable_https" env:"ENABLE_HTTPS"`
 		// Length of the buffer for asynchronous deletion.
 		DeleteBufLen int `yaml:"delete_buffer_length"`
 	}
@@ -60,7 +64,7 @@ type (
 	// Config for application's logger.
 	Logger struct {
 		// Path to store log files.
-		Path string `ymal:"log_path" env:"LOG_PATH"`
+		Path string `yaml:"log_path" env:"LOG_PATH"`
 		// Application logging level.
 		Level string `yaml:"level" env:"LOG_LEVEL" env-default:"info"`
 		// Log files details.
@@ -88,7 +92,7 @@ type NetAddress string
 
 // NewNetAddress returns a pointer to a new NetAddress with default Host and Port.
 func NewNetAddress() *NetAddress {
-	a := NetAddress(fmt.Sprintf("%s:%s", defaultHost, defaultPort))
+	a := NetAddress(DefaultAddress)
 	return &a
 }
 

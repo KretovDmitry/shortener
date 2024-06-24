@@ -119,7 +119,7 @@ func NewFileStore(config *config.Config) (*FileStore, error) {
 		}
 	}
 
-	if fileStore.writeToFileRequired() {
+	if !fileStore.writeToFileRequired() {
 		return fileStore, nil
 	}
 
@@ -204,7 +204,7 @@ func (fs *FileStore) Ping(context.Context) error {
 // writeToFileRequired returns true if the application should save
 // to the file, otherwise - false.
 // According to the specification, writing to the file should be disabled
-// if an empty path for storing the file is specified.
+// if an empty path for storing the file is specified in config.
 func (fs *FileStore) writeToFileRequired() bool {
 	return fs.config.FileStoragePath != ""
 }

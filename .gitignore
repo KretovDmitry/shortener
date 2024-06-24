@@ -16,6 +16,8 @@ cmd/shortener/main
 cmd/shortener/shortener
 cmd/shortener/server
 cmd/staticlint/lint
+shortenertestbeta
+statictest
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -32,3 +34,6 @@ short-url-db.json
 
 # pid file
 .pid
+
+# secret info
+secret.yml

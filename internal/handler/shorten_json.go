@@ -21,9 +21,9 @@ type (
 	}
 
 	shortenJSONResponsePayload struct {
-		Result  models.ShortURL `json:"result"`
-		Message string          `json:"message"`
-		Success bool            `json:"success"`
+		Result  string `json:"result"`
+		Message string `json:"message"`
+		Success bool   `json:"success"`
 	}
 )
 
@@ -85,7 +85,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate short URL
-	generatedShortURL := shorturl.Generate(payload.URL)
+	shortURL := shorturl.Generate(payload.URL)
 
 	user, ok := user.FromContext(r.Context())
 	if !ok {
@@ -93,11 +93,11 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
+	newRecord := models.NewRecord(shortURL, payload.URL, user.ID)
 
 	// Build the JWT authentication token.
 	authToken, err := jwt.BuildJWTString(user.ID,
-		h.config.JWT.SigningKey, time.Duration(h.config.JWT.Expiration))
+		h.config.JWT.SigningKey, h.config.JWT.Expiration)
 	if err != nil {
 		h.shortenJSONError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
@@ -123,15 +123,16 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(time.Duration(h.config.JWT.Expiration)),
+		Expires:  time.Now().Add(h.config.JWT.Expiration),
 		HttpOnly: true,
 	})
 
 	// create response payload
-	result := shortenJSONResponsePayload{Result: models.ShortURL(generatedShortURL), Success: true, Message: "OK"}
+	s := fmt.Sprintf("http://%s/%s", h.config.HTTPServer.ReturnAddress, shortURL)
+	result := shortenJSONResponsePayload{Result: s, Success: true, Message: "OK"}
 
 	// encode response body
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err = json.NewEncoder(w).Encode(result); err != nil {
 		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -142,7 +143,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 // headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
 	logger := h.logger.SkipCaller(1)
-	if code >= 500 {
+	if code >= http.StatusInternalServerError {
 		logger.Errorf("%s: %s", message, err)
 	} else {
 		logger.Infof("%s: %s", message, err)

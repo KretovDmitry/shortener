@@ -10,8 +10,8 @@ import (
 )
 
 func ExampleNetAddress_String() {
-	addr := &config.NetAddress{Host: "example.com", Port: 8080}
-	fmt.Println(addr.String()) // Output: example.com:8080
+	addr := config.NewNetAddress()
+	fmt.Println(addr.String()) // Output: 0.0.0.0:8080
 }
 
 func ExampleNetAddress_Set() {
@@ -42,40 +42,4 @@ func TestNetAddress_SetInvalid(t *testing.T) {
 		err := addr.Set(c.input)
 		require.Error(t, err, "invalid address produces no error")
 	}
-}
-
-func ExampleFileStorage_Set_noDefault() {
-	fs := config.NewFileStorage()
-
-	err := fs.Set("path/to/storage")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(fs.String(), fs.WriteRequired)
-	// Output: path/to/storage true
-}
-
-func ExampleFileStorage_Set_default() {
-	fs := config.NewFileStorage()
-
-	err := fs.Set("")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(fs.String(), fs.WriteRequired)
-	// Output: /tmp/short-url-db.json false
-}
-
-func TestFileStorage_Path(t *testing.T) {
-	fs := config.NewFileStorage()
-
-	path := "path/to/storage"
-
-	err := fs.Set(path)
-	require.NoError(t, err)
-
-	require.Equal(t, path, fs.Path)
-	require.True(t, fs.WriteRequired)
 }

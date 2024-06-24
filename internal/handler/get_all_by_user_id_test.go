@@ -8,11 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +42,10 @@ func TestGetAllByUserID_Method(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
+			l, _ := logger.NewForTest()
+			c := config.NewForTest()
+
+			handler, err := New(memstore.NewURLRepository(), c, l)
 			require.NoError(t, err, "new handler error")
 
 			handler.GetAllByUserID(w, r)
@@ -66,7 +70,10 @@ func TestGetAllByUserID_WithoutUserInContext(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
+	l, _ := logger.NewForTest()
+	c := config.NewForTest()
+
+	handler, err := New(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -91,7 +98,10 @@ func TestGetAllByUserID_NoData(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	handler, err := New(db.NewInMemoryStore(), logger.Get(), 5)
+	l, _ := logger.NewForTest()
+	c := config.NewForTest()
+
+	handler, err := New(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -131,12 +141,15 @@ func TestGetAllByUserID_Data(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	mocks := db.NewInMemoryStore()
+	mocks := memstore.NewURLRepository()
 
 	err := mocks.SaveAll(context.TODO(), data)
 	require.NoError(t, err, "save failed")
 
-	handler, err := New(mocks, logger.Get(), 5)
+	l, _ := logger.NewForTest()
+	c := config.NewForTest()
+
+	handler, err := New(mocks, c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)

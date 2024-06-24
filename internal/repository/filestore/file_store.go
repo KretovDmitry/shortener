@@ -74,9 +74,10 @@ func (c *Consumer) ReadRecord() (*models.URL, error) {
 	return record, nil
 }
 
-// fileStore is a struct that represents a file-based storage system for URL records.
-type fileStore struct {
-	// cache is an InMemoryStore instance used for caching URL records.
+// FileStore is a struct that represents a file-based storage system for URL records.
+type FileStore struct {
+	// cache is an in memory instance of URL repository
+	// used for caching URL records.
 	cache *memstore.URLRepository
 	// file is a Producer instance used for writing URL records to the file.
 	file *Producer
@@ -85,18 +86,18 @@ type fileStore struct {
 }
 
 // NewFileStore creates a new fileStore instance for managing URL records in a file.
-func NewFileStore(config *config.Config) (*fileStore, error) {
+func NewFileStore(config *config.Config) (*FileStore, error) {
 	if config == nil {
 		return nil, fmt.Errorf("%w: config", errs.ErrNilDependency)
 	}
 
-	fileStore := &fileStore{
+	fileStore := &FileStore{
 		cache:  memstore.NewURLRepository(),
 		file:   nil,
 		config: config,
 	}
 
-	consumer, err := NewConsumer(config.FS.Path)
+	consumer, err := NewConsumer(config.FileStoragePath)
 	if err != nil {
 		return nil, fmt.Errorf("new consumer: %w", err)
 	}
@@ -118,11 +119,11 @@ func NewFileStore(config *config.Config) (*fileStore, error) {
 		}
 	}
 
-	if !config.FS.WriteRequired {
+	if fileStore.writeToFileRequired() {
 		return fileStore, nil
 	}
 
-	producer, err := NewProducer(config.FS.Path)
+	producer, err := NewProducer(config.FileStoragePath)
 	if err != nil {
 		return nil, fmt.Errorf("new producer: %w", err)
 	}
@@ -133,22 +134,22 @@ func NewFileStore(config *config.Config) (*fileStore, error) {
 }
 
 // Get retrieves a URL record from the cache by its short URL.
-func (fs *fileStore) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
+func (fs *FileStore) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
 	return fs.cache.Get(ctx, sURL)
 }
 
 // GetAllByUserID retrieves all URL records belonging to a specific user from the cache.
-func (fs *fileStore) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
+func (fs *FileStore) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
 	return fs.cache.GetAllByUserID(ctx, userID)
 }
 
 // DeleteURLs deletes all URL records belonging to a specific user from the cache.
-func (fs *fileStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
+func (fs *FileStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
 	return fs.cache.DeleteURLs(ctx, urls...)
 }
 
 // Save writes a URL record to the cache and file if required.
-func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
+func (fs *FileStore) Save(ctx context.Context, url *models.URL) error {
 	// check if the record already exists in the cache
 	record, err := fs.cache.Get(ctx, url.ShortURL)
 	if err != nil && !errors.Is(err, errs.ErrNotFound) {
@@ -159,8 +160,8 @@ func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 		return errs.ErrConflict
 	}
 	// write the record to the file if required
-	if fs.config.FS.WriteRequired {
-		if err := fs.file.WriteRecord(url); err != nil {
+	if fs.writeToFileRequired() {
+		if err = fs.file.WriteRecord(url); err != nil {
 			return fmt.Errorf("write record: %w", err)
 		}
 	}
@@ -169,7 +170,7 @@ func (fs *fileStore) Save(ctx context.Context, url *models.URL) error {
 }
 
 // SaveAll saves multiple URL records to the cache and file if required.
-func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
+func (fs *FileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 	for _, url := range urls {
 		// check if the record already exists in the cache
 		record, err := fs.cache.Get(ctx, url.ShortURL)
@@ -181,13 +182,13 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 			continue
 		}
 		// write the record to the file if required
-		if fs.config.FS.WriteRequired {
-			if err := fs.file.WriteRecord(url); err != nil {
+		if fs.writeToFileRequired() {
+			if err = fs.file.WriteRecord(url); err != nil {
 				return fmt.Errorf("write file record: %w", err)
 			}
 		}
 		// save the record to the cache if writing to the file was successful if required
-		if err := fs.cache.Save(ctx, url); err != nil {
+		if err = fs.cache.Save(ctx, url); err != nil {
 			return fmt.Errorf("save record: %w", err)
 		}
 	}
@@ -196,6 +197,14 @@ func (fs *fileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 
 // Ping is a placeholder method that returns an error
 // indicating that the database is not connected [ErrDBNotConnected].
-func (fs *fileStore) Ping(context.Context) error {
+func (fs *FileStore) Ping(context.Context) error {
 	return errs.ErrDBNotConnected
+}
+
+// writeToFileRequired returns true if the application should save
+// to the file, otherwise - false.
+// According to the specification, writing to the file should be disabled
+// if an empty path for storing the file is specified.
+func (fs *FileStore) writeToFileRequired() bool {
+	return fs.config.FileStoragePath != ""
 }

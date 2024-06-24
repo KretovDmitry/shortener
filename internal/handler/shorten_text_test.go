@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models/user"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/KretovDmitry/shortener/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,8 +100,9 @@ func TestPostShortenText_NewRecord(t *testing.T) {
 				Return(nil)
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(m, &config.Config{}, l, 5)
+			handler, err := New(m, c, l)
 			require.NoError(t, err, "failed to init handler")
 
 			handler.PostShortenText(w, r)
@@ -198,8 +199,9 @@ func TestPostShortenText_RepeatedRecord(t *testing.T) {
 				Return(errs.ErrConflict)
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(m, &config.Config{}, l, 5)
+			handler, err := New(m, c, l)
 			require.NoError(t, err, "failed to init handler")
 
 			handler.PostShortenText(w, r)
@@ -239,8 +241,9 @@ func TestPostShortenText_BadMethods(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(db.NewInMemoryStore(), &config.Config{}, l, 5)
+			handler, err := New(memstore.NewURLRepository(), c, l)
 			require.NoError(t, err, "new handler context error")
 
 			handler.PostShortenText(w, r)
@@ -330,8 +333,9 @@ func TestPostShortenText_BadContentTypes(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(db.NewInMemoryStore(), &config.Config{}, l, 5)
+			handler, err := New(memstore.NewURLRepository(), c, l)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.PostShortenText(w, r)
@@ -366,8 +370,9 @@ func TestPostShortenText_BadReader(t *testing.T) {
 	m := mocks.NewMockURLStorage(ctrl)
 
 	l, _ := logger.NewForTest()
+	c := config.NewForTest()
 
-	handler, err := New(m, &config.Config{}, l, 5)
+	handler, err := New(m, c, l)
 	require.NoError(t, err, "failed to init new handler")
 
 	handler.PostShortenText(w, r)
@@ -439,8 +444,9 @@ func TestPostShortenText_BadPayload(t *testing.T) {
 			m := mocks.NewMockURLStorage(ctrl)
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(m, &config.Config{}, l, 5)
+			handler, err := New(m, c, l)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.PostShortenText(w, r)
@@ -471,8 +477,9 @@ func TestPostShortenText_WithoutUserInContext(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	l, _ := logger.NewForTest()
+	c := config.NewForTest()
 
-	handler, err := New(db.NewInMemoryStore(), &config.Config{}, l, 5)
+	handler, err := New(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "failed to init new handler")
 
 	handler.PostShortenText(w, r)
@@ -504,8 +511,9 @@ func TestPostShortenText_BadStore(t *testing.T) {
 		Return(errIntentionallyNotWorkingMethod)
 
 	l, _ := logger.NewForTest()
+	c := config.NewForTest()
 
-	handler, err := New(m, &config.Config{}, l, 5)
+	handler, err := New(m, c, l)
 	require.NoError(t, err, "failed to init new handler")
 
 	handler.PostShortenText(w, r)

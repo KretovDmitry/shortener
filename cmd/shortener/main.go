@@ -15,9 +15,11 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
+	"github.com/KretovDmitry/shortener/internal/repository"
+	"github.com/KretovDmitry/shortener/internal/repository/filestore"
+	"github.com/KretovDmitry/shortener/internal/repository/postgres"
 	_ "github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/pressly/goose"
@@ -52,9 +54,13 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
-	var store db.URLStorage
+	// Single store used by the app. Could be in memory, file storage or
+	// postgres based on configuration.
+	var store repository.URLStorage
 
-	if cfg.DSN != "" {
+	switch cfg.DSN {
+	default:
+		logger.Infof("DSN: %q", cfg.DSN)
 		// Connect to the postgres.
 		db, err := sql.Open("pgx", cfg.DSN)
 		if err != nil {
@@ -79,27 +85,42 @@ func run() error {
 		// Up all migrations for github tests.
 		err = goose.Up(db, cfg.Migrations)
 		if err != nil {
-			return fmt.Errorf("goose: failed to migrate DB: %v", err)
+			return fmt.Errorf("goose: failed to migrate DB: %w", err)
 		}
 
+		// Init postgres URL repository.
+		store, err = postgres.NewURLRepository(db, logger)
+		if err != nil {
+			return fmt.Errorf("new postgres repository: %w", err)
+		}
+	case "":
+		logger.Info("DSN is not provided, initializing file storage")
+		// Init file URL repository.
+		var err error
+		store, err = filestore.NewFileStore(cfg)
+		if err != nil {
+			return fmt.Errorf("new file repository: %w", err)
+		}
+		if cfg.FileStoragePath != "" {
+			logger.Infof("file storage initialaized at: %s",
+				cfg.FileStoragePath)
+		}
 	}
 
-	store, err := db.NewStore(serverCtx, logger)
-	if err != nil {
-		return fmt.Errorf("new store: %w", err)
-	}
-
-	handler, err := handler.New(store, cfg, logger, 5)
+	// Init HTTP handlers.
+	handler, err := handler.New(store, cfg, logger)
 	if err != nil {
 		return fmt.Errorf("new handler: %w", err)
 	}
+	// Stop async short URL deletion.
 	defer handler.Stop()
 
+	// Init HTTP server.
 	hs := &http.Server{
 		Addr:              cfg.HTTPServer.RunAddress.String(),
 		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
 		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
-		Handler:           handler.Register(chi.NewRouter(), logger),
+		Handler:           handler.Register(chi.NewRouter(), cfg, logger),
 	}
 
 	// Graceful shutdown.

@@ -24,7 +24,6 @@ type URLRepository struct {
 // NewPostgresStore creates a new Postgres database connection pool
 // and initializes the database schema.
 func NewURLRepository(
-	ctx context.Context,
 	db *sql.DB,
 	logger logger.Logger,
 ) (*URLRepository, error) {

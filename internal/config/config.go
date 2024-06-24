@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,9 +20,11 @@ import (
 // Default values for config.
 const (
 	defaultHost     = "0.0.0.0"
-	defaultPort     = 8080
+	defaultPort     = "8080"
 	defaultFileName = "short-url-db.json"
 )
+
+var defaultFileStoragePath = path.Join(os.TempDir(), defaultFileName)
 
 type (
 	// Config represents an application configuration.
@@ -29,21 +32,24 @@ type (
 		// The data source name (DSN) for connecting to the database.
 		DSN string `yaml:"dsn" env:"DATABASE_DSN"`
 		// Subconfigs.
-		HTTPServer HTTPServer   `yaml:"http_server"`
-		FS         *FileStorage `yaml:"file_staroge" env:"FILE_STORAGE_PATH"`
-		JWT        JWT          `yaml:"jwt"`
-		Logger     Logger       `yaml:"logger"`
+		HTTPServer HTTPServer `yaml:"http_server"`
+		JWT        JWT        `yaml:"jwt"`
+		Logger     Logger     `yaml:"logger"`
 		// Path to migrations.
 		Migrations string `yaml:"migrations_path"`
+		// Path to the file storage.
+		FileStoragePath string `yaml:"file_staroge_path" env:"FILE_STORAGE_PATH"`
 		// TLSEnable determines whether the server will be started in the TLS mode.
 		TLSEnabled TLSEnabled `yaml:"tls"`
+		// Length of the buffer for asynchronous deletion.
+		DeleteBufLen int `yaml:"delete_buffer_length"`
 	}
 	// Config for HTTP server.
 	HTTPServer struct {
 		// Address to run the server.
-		RunAddress *NetAddress `yaml:"server_address" json:"server_address" env:"SERVER_ADDRESS"`
+		RunAddress *NetAddress `yaml:"server_address" env:"SERVER_ADDRESS"`
 		// Address to return short URL with.
-		ReturnAddress *NetAddress `yaml:"return_address" json:"return_address" env:"BASE_URL"`
+		ReturnAddress *NetAddress `yaml:"return_address" env:"BASE_URL"`
 		// Read header timeout.
 		Timeout time.Duration `yaml:"timeout" env-default:"5s"`
 		// Idle timeout.
@@ -73,32 +79,26 @@ type (
 
 // Flag Value interface implementation guards.
 var (
-	_ flag.Value = (*NetAddress)(nil)
-	_ flag.Value = (*FileStorage)(nil)
+	_ flag.Value      = (*NetAddress)(nil)
+	_ cleanenv.Setter = (*NetAddress)(nil)
 )
 
 // NetAddress represents a network address with a host and a port.
-type NetAddress struct {
-	Host string
-	Port int
-}
+type NetAddress string
 
 // NewNetAddress returns a pointer to a new NetAddress with default Host and Port.
 func NewNetAddress() *NetAddress {
-	return &NetAddress{
-		Host: defaultHost,
-		Port: defaultPort,
-	}
+	a := NetAddress(fmt.Sprintf("%s:%s", defaultHost, defaultPort))
+	return &a
 }
 
 // String returns a string representation of the NetAddress in the form "host:port".
 func (a *NetAddress) String() string {
-	return fmt.Sprintf("%s:%d", a.Host, a.Port)
+	return string(*a)
 }
 
-// Set sets the host and port of the NetAddress from a string in the form "host:port".
-//
-// It returns an error if the input string is not in the correct format.
+// Set sets the host and port of the NetAddress from a string
+// in the form "host:port".
 func (a *NetAddress) Set(s string) error {
 	s = strings.TrimPrefix(s, "http://")
 	s = strings.TrimPrefix(s, "https://")
@@ -109,63 +109,22 @@ func (a *NetAddress) Set(s string) error {
 		return errors.New("need address in a form host:port")
 	}
 
-	port, err := strconv.Atoi(hp[1])
-	if err != nil {
-		return err
+	if _, err := strconv.Atoi(hp[1]); err != nil {
+		return fmt.Errorf("invalid port: %w", err)
 	}
-	a.Port = port
 
 	if hp[0] != "" {
-		a.Host = hp[0]
+		*a = NetAddress(fmt.Sprintf("%s:%s", hp[0], hp[1]))
+		return nil
 	}
 
+	*a = NetAddress(fmt.Sprintf("%s:%s", defaultHost, hp[1]))
 	return nil
 }
 
 // SetValue implements cleanenv value setter.
 func (a *NetAddress) SetValue(s string) error {
 	return a.Set(s)
-}
-
-// FileStorage represents a file storage configuration
-// with a path and a write requirement flag.
-type FileStorage struct {
-	Path          string `yaml:"path"`
-	WriteRequired bool   `yaml:"write_required"`
-}
-
-// NewFileStorage returns a pointer to a new fileStorage configuration
-// with default path and write requirement.
-func NewFileStorage() *FileStorage {
-	tmp := os.TempDir()
-	return &FileStorage{
-		Path:          path.Join(tmp, defaultFileName),
-		WriteRequired: true,
-	}
-}
-
-// String returns a string representation of the fileStorage path.
-func (fs *FileStorage) String() string {
-	return fs.Path
-}
-
-// Set sets the file storage path from a string.
-//
-// If provided string is empty there will be no file writing.
-func (fs *FileStorage) Set(s string) error {
-	if s == "" {
-		fs.WriteRequired = false
-		return nil
-	}
-
-	fs.Path = s
-
-	return nil
-}
-
-// SetValue implements cleanenv value setter.
-func (fs *FileStorage) SetValue(s string) error {
-	return fs.Set(s)
 }
 
 // TLSEnabled determines whether the server will be started in the TLS mode.
@@ -203,12 +162,7 @@ func (tls *TLSEnabled) SetValue(s string) error {
 
 // String returns a string representation of the TLSEnabled flag.
 func (tls *TLSEnabled) String() string {
-	switch *tls {
-	case true:
-		return "true"
-	default:
-		return "false"
-	}
+	return fmt.Sprintf("%v", *tls)
 }
 
 // Order of loading configuration:
@@ -219,44 +173,77 @@ func (tls *TLSEnabled) String() string {
 // Load returns an application configuration which is populated
 // from the given configuration file, environment variables and flags.
 func MustLoad() *Config {
-	// Configuration file path.
-	configPath := flag.String("config", "./config/local.yml", "path to the config file")
-	flag.Parse()
-
-	// Check if file exists.
-	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
-		log.Fatalf("config file does not exist: %v", err)
-	}
-
 	var cfg Config
 	// Setup default values.
 	cfg.HTTPServer.RunAddress = NewNetAddress()
 	cfg.HTTPServer.ReturnAddress = NewNetAddress()
-	cfg.FS = NewFileStorage()
+	cfg.FileStoragePath = defaultFileStoragePath
 
-	// Load from YAML cfg file.
-	file, err := os.Open(*configPath)
-	if err != nil {
-		log.Fatalf("failed to open config file: %v", err)
-	}
-	if err = cleanenv.ParseYAML(file, &cfg); err != nil {
-		log.Fatalf("failed to parse config file: %v", err)
+	// Configuration file path.
+	configPath, set := os.LookupEnv("CONFIG")
+
+	if set {
+		// Check if file exists.
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			log.Fatalf("config file does not exist: %v", err)
+		}
+
+		// Load from config file.
+		file, err := os.Open(configPath)
+		if err != nil {
+			log.Fatalf("failed to open config file: %v", err)
+		}
+
+		// Support different file extensions.
+		ext := filepath.Ext(configPath)
+		switch ext {
+		case ".yaml", ".yml":
+			if err = cleanenv.ParseYAML(file, &cfg); err != nil {
+				log.Fatalf("failed to parse config file: %v", err)
+			}
+		case ".json":
+			if err = cleanenv.ParseJSON(file, &cfg); err != nil {
+				log.Fatalf("failed to parse config file: %v", err)
+			}
+		default:
+			log.Fatalf("unsupported configuration file extension: %q", ext)
+		}
 	}
 
 	// Read given flags. If not provided use file values.
 	flag.Var(cfg.HTTPServer.RunAddress, "a", "server start address in form host:port")
 	flag.Var(cfg.HTTPServer.ReturnAddress, "b", "server return address in form host:port")
-	flag.Var(cfg.FS, "f", "file storage path")
 	flag.Var(&cfg.TLSEnabled, "s", "run the server in TLS mode")
+	flag.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "file storage path")
 	flag.StringVar(&cfg.DSN, "d", cfg.DSN, "server data source name")
-	flag.StringVar(&cfg.Logger.Level, "l", "info", "logging level")
-	flag.StringVar(&cfg.Migrations, "m", ".", "path to migration directory")
+	flag.StringVar(&cfg.Logger.Level, "l", cfg.Logger.Level, "logging level")
+	flag.StringVar(&cfg.Migrations, "m", cfg.Migrations, "path to migration directory")
 	flag.Parse()
 
 	// Read environment variables.
-	if err = cleanenv.ReadEnv(&cfg); err != nil {
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
 		log.Fatalf("failed to read environment variables: %v", err)
 	}
 
 	return &cfg
+}
+
+// NewForTest returns application configuration for testing.
+func NewForTest() *Config {
+	return &Config{
+		DSN: "",
+		HTTPServer: HTTPServer{
+			RunAddress:      NewNetAddress(),
+			ReturnAddress:   NewNetAddress(),
+			Timeout:         5 * time.Second,
+			IdleTimeout:     60 * time.Second,
+			ShutdownTimeout: 30 * time.Second,
+		},
+		FileStoragePath: defaultFileStoragePath,
+		JWT: JWT{
+			SigningKey: "test",
+			Expiration: 10 * time.Minute,
+		},
+		DeleteBufLen: 5,
+	}
 }

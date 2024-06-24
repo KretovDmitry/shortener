@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,7 +44,6 @@ func New(
 	store repository.URLStorage,
 	config *config.Config,
 	logger logger.Logger,
-	bufLen int,
 ) (*Handler, error) {
 	if store == nil {
 		return nil, fmt.Errorf("%w: store", errs.ErrNilDependency)
@@ -54,6 +54,9 @@ func New(
 	if logger == nil {
 		return nil, fmt.Errorf("%w: logger", errs.ErrNilDependency)
 	}
+	if config.DeleteBufLen <= 0 {
+		return nil, errors.New("buffer length should be >= 1")
+	}
 
 	h := &Handler{
 		store:          store,
@@ -62,7 +65,7 @@ func New(
 		deleteURLsChan: make(chan *models.URL),
 		wg:             &sync.WaitGroup{},
 		done:           make(chan struct{}),
-		bufLen:         bufLen,
+		bufLen:         config.DeleteBufLen,
 	}
 
 	h.wg.Add(1)
@@ -98,11 +101,11 @@ func (h *Handler) Stop() {
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *Handler) Register(r chi.Router, logger logger.Logger) chi.Router {
+func (h *Handler) Register(r chi.Router, config *config.Config, logger logger.Logger) chi.Router {
 	r.Use(accesslog.Handler(logger))
 	r.Use(gzip.DefaultHandler().WrapHandler)
-	r.Use(middleware.Unzip)
-	r.Use(middleware.Authorization)
+	r.Use(middleware.Unzip(logger))
+	r.Use(middleware.Authorization(config, logger))
 
 	r.Post("/", h.PostShortenText)
 	r.Post("/api/shorten", h.PostShortenJSON)
@@ -114,7 +117,7 @@ func (h *Handler) Register(r chi.Router, logger logger.Logger) chi.Router {
 	r.Delete("/api/user/urls", h.DeleteURLs)
 
 	r.Route("/api/user", func(r chi.Router) {
-		r.Use(middleware.OnlyWithToken)
+		r.Use(middleware.OnlyWithToken(config, logger))
 		r.Get("/urls", h.GetAllByUserID)
 	})
 
@@ -175,7 +178,7 @@ func (h *Handler) flush(URLs ...*models.URL) error {
 // textError writes error response to the response writer in a text/plain format.
 func (h *Handler) textError(w http.ResponseWriter, message string, err error, code int) {
 	logger := h.logger.SkipCaller(1)
-	if code >= 500 {
+	if code >= http.StatusInternalServerError {
 		logger.Errorf("%s: %s", message, err)
 	} else {
 		logger.Infof("%s: %s", message, err)

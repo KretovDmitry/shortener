@@ -10,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/repository"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ var errIntentionallyNotWorkingMethod = errors.New("intentionally not working met
 // simulating errors with storage operations.
 type brokenStore struct{}
 
-var _ db.URLStorage = (*brokenStore)(nil)
+var _ repository.URLStorage = (*brokenStore)(nil)
 
 func (s *brokenStore) Save(context.Context, *models.URL) error {
 	return errIntentionallyNotWorkingMethod
@@ -60,15 +61,15 @@ func (br *brokenReader) Read(_ []byte) (int, error) {
 	return 0, errIntentionallyNotWorkingMethod
 }
 
-func initMockStore(u *models.URL) *db.InMemoryStore {
-	inMem := db.NewInMemoryStore()
-	_ = inMem.Save(context.TODO(), u)
-	return inMem
+func initMockStore(u *models.URL) *memstore.URLRepository {
+	s := memstore.NewURLRepository()
+	_ = s.Save(context.TODO(), u)
+	return s
 }
 
 func TestNew(t *testing.T) {
 	type args struct {
-		store db.URLStorage
+		store repository.URLStorage
 	}
 	tests := []struct {
 		args    args
@@ -79,10 +80,10 @@ func TestNew(t *testing.T) {
 		{
 			name: "positive test #1",
 			args: args{
-				store: db.NewInMemoryStore(),
+				store: memstore.NewURLRepository(),
 			},
 			want: &Handler{
-				store: db.NewInMemoryStore(),
+				store: memstore.NewURLRepository(),
 			},
 			wantErr: false,
 		},
@@ -98,7 +99,7 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l, _ := logger.NewForTest()
-			got, err := New(tt.args.store, &config.Config{}, l, 5)
+			got, err := New(tt.args.store, config.NewForTest(), l)
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}

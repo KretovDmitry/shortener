@@ -10,11 +10,12 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
+	"github.com/KretovDmitry/shortener/internal/repository"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,8 +28,7 @@ func TestPostShortenBatch(t *testing.T) {
 		{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","original_url":"https://go.dev/"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","original_url":"https://e.mail.ru/inbox/"}
 	]`
 
-	happyResponse := fmt.Sprintf(`[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/YBbxJEcQ9vq"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://%[1]s/TZqSKV4tcyE"}]`,
-		config.AddrToReturn)
+	happyResponse := `[{"correlation_id":"42b4cb1b-abf0-44e7-89f9-72ad3a277e0a","short_url":"http://%[1]s/YBbxJEcQ9vq"},{"correlation_id":"229d9603-8540-4925-83f6-5cb1f239a72b","short_url":"http://0.0.0.0:8080/TZqSKV4tcyE"}]`
 
 	const invalidJSON = `
 	[
@@ -55,7 +55,7 @@ func TestPostShortenBatch(t *testing.T) {
 		method      string
 		contentType string
 		payload     string
-		store       db.URLStorage
+		store       repository.URLStorage
 		want        want
 		wantErr     bool
 	}{
@@ -64,7 +64,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   happyResponse,
@@ -86,7 +86,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodGet,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodGet),
@@ -97,7 +97,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPut,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
@@ -108,7 +108,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPatch,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
@@ -119,7 +119,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodDelete,
 			contentType: applicationJSON,
 			payload:     goodPayload,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
@@ -130,7 +130,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     goodPayload,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, textPlain),
@@ -141,7 +141,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     invalidJSON,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   errs.ErrInvalidRequest.Error(),
@@ -153,7 +153,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     "",
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   errs.ErrInvalidRequest.Error(),
@@ -165,7 +165,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     emptyURL,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: URL is not provided", errs.ErrInvalidRequest),
@@ -176,7 +176,7 @@ func TestPostShortenBatch(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     invalidURL,
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest),
@@ -203,8 +203,9 @@ func TestPostShortenBatch(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(tt.store, &config.Config{}, l, 5)
+			handler, err := New(tt.store, c, l)
 			require.NoError(t, err, "new handler error")
 
 			handler.PostShortenBatch(w, r)
@@ -245,8 +246,9 @@ func TestShortenBatch_WithoutUserInContext(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	l, _ := logger.NewForTest()
+	c := config.NewForTest()
 
-	handler, err := New(db.NewInMemoryStore(), &config.Config{}, l, 5)
+	handler, err := New(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.PostShortenBatch(w, r)

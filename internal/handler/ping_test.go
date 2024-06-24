@@ -8,16 +8,16 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
+	"github.com/KretovDmitry/shortener/internal/repository"
 	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type connectedStore struct {
-	*db.InMemoryStore
+	*memstore.URLRepository
 }
 
 func (s *connectedStore) Ping(context.Context) error {
@@ -34,7 +34,7 @@ func TestGetPingDB(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		store db.URLStorage
+		store repository.URLStorage
 		want  want
 	}{
 		{
@@ -47,7 +47,7 @@ func TestGetPingDB(t *testing.T) {
 		},
 		{
 			name:  "DB not connected",
-			store: db.NewInMemoryStore(),
+			store: memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response: fmt.Sprintf(
@@ -73,8 +73,9 @@ func TestGetPingDB(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(tt.store, &config.Config{}, l, 5)
+			handler, err := New(tt.store, c, l)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.GetPingDB(w, r)
@@ -113,8 +114,9 @@ func TestGetPing_Method(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(memstore.NewURLRepository(), &config.Config{}, l, 5)
+			handler, err := New(memstore.NewURLRepository(), c, l)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.GetPingDB(w, r)

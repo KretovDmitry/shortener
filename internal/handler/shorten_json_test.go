@@ -10,11 +10,12 @@ import (
 	"testing"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
 	"github.com/KretovDmitry/shortener/internal/models/user"
+	"github.com/KretovDmitry/shortener/internal/repository"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ func TestPostShortenJSON(t *testing.T) {
 		method      string
 		contentType string
 		payload     io.Reader
-		store       db.URLStorage
+		store       repository.URLStorage
 		want        want
 		wantErr     bool
 	}{
@@ -41,7 +42,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://e.mail.ru/inbox/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "TZqSKV4tcyE",
@@ -53,7 +54,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusCreated,
 				response:   "YBbxJEcQ9vq",
@@ -80,7 +81,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodGet,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodGet),
@@ -92,7 +93,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPut,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPut),
@@ -104,7 +105,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPatch,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodPatch),
@@ -116,7 +117,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodDelete,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, http.MethodDelete),
@@ -128,7 +129,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: textPlain,
 			payload:     strings.NewReader(`{"url":"https://go.dev/"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: %s", errs.ErrInvalidRequest, textPlain),
@@ -140,7 +141,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url";"https://test.com"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusInternalServerError,
 				response:   "failed to decode request",
@@ -152,7 +153,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":""}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: URL is not provided", errs.ErrInvalidRequest),
@@ -164,7 +165,7 @@ func TestPostShortenJSON(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: applicationJSON,
 			payload:     strings.NewReader(`{"url":"https://test...com"}`),
-			store:       db.NewInMemoryStore(),
+			store:       memstore.NewURLRepository(),
 			want: want{
 				statusCode: http.StatusBadRequest,
 				response:   fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest),
@@ -193,8 +194,9 @@ func TestPostShortenJSON(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			l, _ := logger.NewForTest()
+			c := config.NewForTest()
 
-			handler, err := New(tt.store, &config.Config{}, l, 5)
+			handler, err := New(tt.store, c, l)
 			require.NoError(t, err, "new handler context error")
 
 			handler.PostShortenJSON(w, r)
@@ -227,8 +229,9 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	l, _ := logger.NewForTest()
+	c := config.NewForTest()
 
-	handler, err := New(db.NewInMemoryStore(), &config.Config{}, l, 5)
+	handler, err := New(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.PostShortenJSON(w, r)

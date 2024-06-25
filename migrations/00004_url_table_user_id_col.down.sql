@@ -1,0 +1,3 @@
+ALTER TABLE IF EXISTS public.url
+    DROP COLUMN IF EXISTS user_id;
+

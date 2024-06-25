@@ -54,8 +54,6 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
-	logger.Errorf("%#v", cfg)
-
 	// Single store used by the app. Could be in memory, file storage or
 	// postgres based on configuration.
 	var store repository.URLStorage
@@ -103,7 +101,7 @@ func run() error {
 			return fmt.Errorf("new file repository: %w", err)
 		}
 		if cfg.FileStoragePath != "" {
-			logger.Infof("file storage initialaized at: %s",
+			logger.Infof("file storage initialaized at: %q",
 				cfg.FileStoragePath)
 		}
 	}
@@ -167,7 +165,7 @@ func run() error {
 	select {
 	case <-serverCtx.Done():
 	case <-time.After(cfg.HTTPServer.ShutdownTimeout):
-		return errors.New("graceful shutdown timed out.. forcing exit")
+		return errors.New("graceful shutdown timed out... forcing exit")
 	}
 
 	return nil

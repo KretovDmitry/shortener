@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/KretovDmitry/shortener/internal/errs"
@@ -66,7 +67,9 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 
 	response := make([]getAllByUserIDResponsePayload, len(URLs))
 	for i, u := range URLs {
-		response[i].ShortURL = u.ShortURL
+		su := fmt.Sprintf("http://%s/%s",
+			h.config.HTTPServer.ReturnAddress, u.ShortURL)
+		response[i].ShortURL = models.ShortURL(su)
 		response[i].OriginalURL = u.OriginalURL
 	}
 
@@ -75,7 +78,7 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// encode response body
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err = json.NewEncoder(w).Encode(response); err != nil {
 		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

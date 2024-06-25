@@ -103,6 +103,12 @@ yp-test: ## run all Yandex Practicum E2E tests
 	make yp-test-iter10
 	## make yp-test-iter11
 	make yp-test-iter12
+	make yp-test-iter13
+	make yp-test-iter14
+	make yp-test-iter15
+	make yp-test-iter16
+	make yp-test-iter17
+	make yp-test-iter18
 
 .PHONY: yp-test-iter1
 yp-test-iter1: ## run test for iter1 [sudo]
@@ -189,4 +195,46 @@ yp-test-iter12: ## run test for iter12 [sudo]
 	@echo "------------- Running TestIteration12 -------------"
 	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration12$$ \
 		-binary-path=${BINARY_PATH} -database-dsn=${APP_DSN}
+
+.PHONY: yp-test-iter13
+yp-test-iter13: ## run test for iter13 [sudo]
+	@chmod +x ./shortenertestbeta
+	@echo "------------- Running TestIteration13 -------------"
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration13$$ \
+		-binary-path=${BINARY_PATH} -database-dsn=${APP_DSN}
+
+.PHONY: yp-test-iter14
+yp-test-iter14: ## run test for iter14 [sudo]
+	@chmod +x ./shortenertestbeta
+	@echo "------------- Running TestIteration14 -------------"
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration14$$ \
+		-binary-path=${BINARY_PATH} -database-dsn=${APP_DSN}
+
+.PHONY: yp-test-iter15
+yp-test-iter15: ## run test for iter15 [sudo]
+	@chmod +x ./shortenertestbeta
+	@echo "------------- Running TestIteration15 -------------"
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration15$$ \
+		-binary-path=${BINARY_PATH} -database-dsn=${APP_DSN}
+
+.PHONY: yp-test-iter16
+yp-test-iter16: ## run test for iter16 [sudo]
+	@chmod +x ./shortenertestbeta
+	@echo "------------- Running TestIteration16 -------------"
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration16$$ \
+		-source-path=.
+
+.PHONY: yp-test-iter17
+yp-test-iter17: ## run test for iter17 [sudo]
+	@chmod +x ./shortenertestbeta
+	@echo "------------- Running TestIteration17 -------------"
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration17$$ \
+		-source-path=.
+
+.PHONY: yp-test-iter18
+yp-test-iter18: ## run test for iter18 [sudo]
+	@chmod +x ./shortenertestbeta
+	@echo "------------- Running TestIteration18 -------------"
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration18$$ \
+		-source-path=.
 

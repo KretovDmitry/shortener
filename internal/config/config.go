@@ -29,14 +29,16 @@ const (
 	defaultMigtationsPath         = "."
 )
 
+// Default variables.
 var (
+	// Default file storage path.
 	defaultFileStoragePath = path.Join(os.TempDir(), defaultFileName)
 	// Default address to start server and return shortened urls with.
 	DefaultAddress = fmt.Sprintf("%s:%s", defaultHost, defaultPort)
 )
 
+// Config represents an application configuration.
 type (
-	// Config represents an application configuration.
 	Config struct {
 		// The data source name (DSN) for connecting to the database.
 		DSN string `yaml:"dsn" env:"DATABASE_DSN"`

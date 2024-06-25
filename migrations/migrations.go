@@ -16,6 +16,7 @@ import (
 //go:embed *.sql
 var fs embed.FS
 
+// Up runs migrations all the way up.
 func Up(db *sql.DB) error {
 	d, err := iofs.New(fs, ".")
 	if err != nil {

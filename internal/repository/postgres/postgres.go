@@ -16,6 +16,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+// URLRepository implements URLStorage interface.
 type URLRepository struct {
 	db     *sql.DB
 	logger logger.Logger

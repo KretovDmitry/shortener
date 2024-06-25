@@ -19,9 +19,14 @@ import (
 
 // Default values for config.
 const (
-	defaultHost     = "0.0.0.0"
-	defaultPort     = "8080"
-	defaultFileName = "short-url-db.json"
+	defaultHost                   = "0.0.0.0"
+	defaultPort                   = "8080"
+	defaultFileName               = "short-url-db.json"
+	defaultLogPath                = "app.log"
+	defaultMaxLogSizeMB           = 5
+	defaultMaxLogBackups          = 10
+	defaultMaxLogFileLifetimeDays = 14
+	defaultMigtationsPath         = "."
 )
 
 var (
@@ -182,6 +187,12 @@ func MustLoad() *Config {
 	cfg.HTTPServer.RunAddress = NewNetAddress()
 	cfg.HTTPServer.ReturnAddress = NewNetAddress()
 	cfg.FileStoragePath = defaultFileStoragePath
+	cfg.Logger.Path = defaultLogPath
+	cfg.Logger.MaxSizeMB = defaultMaxLogSizeMB
+	cfg.Logger.MaxBackups = defaultMaxLogBackups
+	cfg.Logger.MaxAgeDays = defaultMaxLogFileLifetimeDays
+	cfg.Migrations = defaultMigtationsPath
+	cfg.DeleteBufLen = 5
 
 	// Configuration file path.
 	configPath, set := os.LookupEnv("CONFIG")

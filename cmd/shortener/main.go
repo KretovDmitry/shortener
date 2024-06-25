@@ -20,9 +20,9 @@ import (
 	"github.com/KretovDmitry/shortener/internal/repository"
 	"github.com/KretovDmitry/shortener/internal/repository/filestore"
 	"github.com/KretovDmitry/shortener/internal/repository/postgres"
-	_ "github.com/KretovDmitry/shortener/migrations"
+	"github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
-	"github.com/pressly/goose"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	sqldblogger "github.com/simukti/sqldb-logger"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -84,9 +84,9 @@ func run() error {
 		}()
 
 		// Up all migrations for github tests.
-		err = goose.Up(db, cfg.Migrations)
+		err = migrations.Up(db)
 		if err != nil {
-			return fmt.Errorf("goose: failed to migrate DB: %w", err)
+			return fmt.Errorf("failed to migrate DB: %w", err)
 		}
 
 		// Init postgres URL repository.

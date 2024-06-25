@@ -39,7 +39,7 @@ test-cover: test ## run unit tests and show test coverage information
 
 .PHONY: run
 run: ## run the API server
-	@go run ${LDFLAGS} ${MAIN_FILE}
+	@go run  ${LDFLAGS} ${MAIN_FILE} -f=./short-url-db.json
 
 .PHONY: run-restart
 run-restart: ## restart the API server
@@ -108,72 +108,63 @@ yp-test: ## run all Yandex Practicum E2E tests
 yp-test-iter1: ## run test for iter1 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration1 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration1$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration1$$ \
 		-binary-path=${BINARY_PATH}
 
 .PHONY: yp-test-iter2
 yp-test-iter2: ## run test for iter2 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration2 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration2$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration2$$ \
 		-source-path=.
 
 .PHONY: yp-test-iter3
 yp-test-iter3: ## run test for iter3 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration3 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration3$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration3$$ \
 		-source-path=.
 
 .PHONY: yp-test-iter4
 yp-test-iter4: ## run test for iter4 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration4 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration4$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration4$$ \
 		-binary-path=${BINARY_PATH} -server-port=5000
 
 .PHONY: yp-test-iter5
 yp-test-iter5: ## run test for iter5 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration5 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration5$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration5$$ \
 		-binary-path=${BINARY_PATH} -server-port=5000
 
 .PHONY: yp-test-iter6
 yp-test-iter6: ## run test for iter6 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration6 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration6$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration6$$ \
 		-source-path=.
 
 .PHONY: yp-test-iter7
 yp-test-iter7: ## run test for iter7 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration7 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration7$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration7$$ \
 		-binary-path=${BINARY_PATH} -source-path=.
 
 .PHONY: yp-test-iter8
 yp-test-iter8: ## run test for iter8 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration8 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration8$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration8$$ \
 		-binary-path=${BINARY_PATH}
 
 .PHONY: yp-test-iter9
 yp-test-iter9: ## run test for iter9 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration9 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration9$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration9$$ \
 		-binary-path=${BINARY_PATH} -source-path=. \
 		-file-storage-path=/tmp/short-url-db.json
 
@@ -181,8 +172,7 @@ yp-test-iter9: ## run test for iter9 [sudo]
 yp-test-iter10: ## run test for iter10 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration10 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration10$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration10$$ \
 		-binary-path=${BINARY_PATH} -source-path=. \
 		-database-dsn=${APP_DSN}
 
@@ -190,15 +180,13 @@ yp-test-iter10: ## run test for iter10 [sudo]
 yp-test-iter11: ## run test for iter11 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration11 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration11$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration11$$ \
 		-binary-path=${BINARY_PATH} -database-dsn=${APP_DSN}
 
 .PHONY: yp-test-iter12
 yp-test-iter12: ## run test for iter12 [sudo]
 	@chmod +x ./shortenertestbeta
 	@echo "------------- Running TestIteration12 -------------"
-	@sudo CONFIG=${LOCAL_CONFIG} ${DISABLE_HTTPS} \
-		./shortenertestbeta -test.v -test.run=^TestIteration12$$ \
+	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration12$$ \
 		-binary-path=${BINARY_PATH} -database-dsn=${APP_DSN}
 

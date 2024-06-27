@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -26,7 +25,7 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check the content type.
-	if r.Header.Get("Content-Encoding") == "" && !h.IsTextPlainContentType(r) {
+	if r.Header.Get("Content-Encoding") == "" && !isTextPlainContentType(r) {
 		h.textError(w, r.Header.Get("Content-Type"), errs.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
@@ -59,11 +58,7 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate the shortened URL.
-	generatedShortURL, err := shorturl.Generate(originalURL)
-	if err != nil {
-		h.textError(w, "failed to shorten url: "+originalURL, err, http.StatusInternalServerError)
-		return
-	}
+	generatedShortURL := shorturl.Generate(originalURL)
 
 	// Extract the user ID from the request context.
 	user, ok := user.FromContext(r.Context())
@@ -75,24 +70,26 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	// Create a new record with the generated short URL, original URL, and user ID.
 	newRecord := models.NewRecord(generatedShortURL, originalURL, user.ID)
 
-	// Build the JWT authentication token.
-	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
-	if err != nil {
-		h.textError(w, "failed to build JWT token", err, http.StatusInternalServerError)
+	// Save the record to the database.
+	storeErr := h.store.Save(r.Context(), newRecord)
+	if storeErr != nil && !errors.Is(storeErr, errs.ErrConflict) {
+		h.textError(w, "failed to save to database",
+			storeErr, http.StatusInternalServerError)
 		return
 	}
 
-	// Save the record to the database.
-	err = h.store.Save(r.Context(), newRecord)
-	if err != nil && !errors.Is(err, errs.ErrConflict) {
-		h.textError(w, "failed to save to database", err, http.StatusInternalServerError)
+	// Build the JWT authentication token.
+	authToken, err := jwt.BuildJWTString(user.ID,
+		h.config.JWT.SigningKey, time.Duration(h.config.JWT.Expiration))
+	if err != nil {
+		h.textError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
 	}
 
 	// Set the response headers and status code.
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	switch {
-	case errors.Is(err, errs.ErrConflict):
+	case errors.Is(storeErr, errs.ErrConflict):
 		w.WriteHeader(http.StatusConflict)
 	default:
 		w.WriteHeader(http.StatusCreated)
@@ -102,12 +99,12 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(time.Duration(config.JWT)),
+		Expires:  time.Now().Add(time.Duration(h.config.JWT.Expiration)),
 		HttpOnly: true,
 	})
 
 	// Write the response body.
-	_, err = fmt.Fprintf(w, "http://%s/%s", config.AddrToReturn, generatedShortURL)
+	_, err = fmt.Fprintf(w, "http://%s/%s", h.config.HTTPServer.ReturnAddress, generatedShortURL)
 	if err != nil {
 		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

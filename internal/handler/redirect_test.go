@@ -7,10 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/KretovDmitry/shortener/internal/db"
+	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/repository"
+	"github.com/KretovDmitry/shortener/internal/repository/memstore"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +20,7 @@ import (
 
 func TestGetRedirect(t *testing.T) {
 	tests := []struct {
-		store          db.URLStorage
+		store          repository.URLStorage
 		assertResponse func(res *http.Response)
 		name           string
 		method         string
@@ -27,10 +29,10 @@ func TestGetRedirect(t *testing.T) {
 		{
 			name:     "positive test #1",
 			method:   http.MethodGet,
-			shortURL: "TZqSKV4t",
+			shortURL: "TZqSKV4tcyE",
 			store: initMockStore(&models.URL{
 				OriginalURL: "https://e.mail.ru/inbox/",
-				ShortURL:    "TZqSKV4t",
+				ShortURL:    "TZqSKV4tcyE",
 			}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
@@ -41,10 +43,10 @@ func TestGetRedirect(t *testing.T) {
 		{
 			name:     "positive test #2",
 			method:   http.MethodGet,
-			shortURL: "YBbxJEcQ",
+			shortURL: "YBbxJEcQ9vq",
 			store: initMockStore(&models.URL{
 				OriginalURL: "https://go.dev/",
-				ShortURL:    "YBbxJEcQ",
+				ShortURL:    "YBbxJEcQ9vq",
 			}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
@@ -55,7 +57,7 @@ func TestGetRedirect(t *testing.T) {
 		{
 			name:     "invalid method: method post",
 			method:   http.MethodPost,
-			shortURL: "YBbxJEcQ",
+			shortURL: "YBbxJEcQ9vq",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
@@ -68,7 +70,7 @@ func TestGetRedirect(t *testing.T) {
 		{
 			name:     "invalid method: method put",
 			method:   http.MethodPut,
-			shortURL: "YBbxJEcQ",
+			shortURL: "YBbxJEcQ9vq",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
@@ -81,7 +83,7 @@ func TestGetRedirect(t *testing.T) {
 		{
 			name:     "invalid method: method patch",
 			method:   http.MethodPatch,
-			shortURL: "YBbxJEcQ",
+			shortURL: "YBbxJEcQ9vq",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
@@ -94,7 +96,7 @@ func TestGetRedirect(t *testing.T) {
 		{
 			name:     "invalid method: method delete",
 			method:   http.MethodDelete,
-			shortURL: "YBbxJEcQ",
+			shortURL: "YBbxJEcQ9vq",
 			store:    initMockStore(&models.URL{OriginalURL: "https://go.dev/"}),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
@@ -105,34 +107,10 @@ func TestGetRedirect(t *testing.T) {
 			},
 		},
 		{
-			name:     "invalid url: too long URL",
-			method:   http.MethodGet,
-			shortURL: "Too_Long_URL", // > 8 characters
-			store:    db.NewInMemoryStore(),
-			assertResponse: func(res *http.Response) {
-				require.NoError(t, res.Body.Close(), "failed close body")
-				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getResponseTextPayload(t, res)
-				assert.Equal(t, fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest), resBody)
-			},
-		},
-		{
-			name:     "invalid url: too short URL",
-			method:   http.MethodGet,
-			shortURL: "short", // < 8 characters
-			store:    db.NewInMemoryStore(),
-			assertResponse: func(res *http.Response) {
-				require.NoError(t, res.Body.Close(), "failed close body")
-				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
-				resBody := getResponseTextPayload(t, res)
-				assert.Equal(t, fmt.Sprintf("%s: invalid URL", errs.ErrInvalidRequest), resBody)
-			},
-		},
-		{
 			name:     "invalid url: invalid base58 characters",
 			method:   http.MethodGet,
 			shortURL: "O0Il0O", // 0OIl+/ are not used
-			store:    db.NewInMemoryStore(),
+			store:    memstore.NewURLRepository(),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -144,7 +122,7 @@ func TestGetRedirect(t *testing.T) {
 			name:     "no such URL",
 			method:   http.MethodGet,
 			shortURL: "2x1xx1x2",
-			store:    db.NewInMemoryStore(),
+			store:    memstore.NewURLRepository(),
 			assertResponse: func(res *http.Response) {
 				require.NoError(t, res.Body.Close(), "failed close body")
 				assert.Equal(t, http.StatusBadRequest, res.StatusCode)
@@ -179,7 +157,10 @@ func TestGetRedirect(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// context with mock store, stop test if failed to init context
-			handler, err := New(tt.store, logger.Get(), 5)
+			l, _ := logger.NewForTest()
+			c := config.NewForTest()
+
+			handler, err := New(tt.store, c, l)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

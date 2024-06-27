@@ -1,4 +1,4 @@
-package db
+package postgres
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -15,44 +14,32 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 )
 
-type postgresStore struct {
-	store  *sql.DB
+// URLRepository implements URLStorage interface.
+type URLRepository struct {
+	db     *sql.DB
 	logger logger.Logger
 }
 
 // NewPostgresStore creates a new Postgres database connection pool
 // and initializes the database schema.
-func NewPostgresStore(
-	ctx context.Context,
-	dsn string,
+func NewURLRepository(
+	db *sql.DB,
 	logger logger.Logger,
-) (*postgresStore, error) {
+) (*URLRepository, error) {
+	if db == nil {
+		return nil, fmt.Errorf("%w: *sql.DB", errs.ErrNilDependency)
+	}
 	if logger == nil {
-		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
+		return nil, fmt.Errorf("%w: logger", errs.ErrNilDependency)
 	}
-
-	DB, err := goose.OpenDBWithDriver("pgx", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("goose: failed to open DB: %v", err)
-	}
-
-	err = goose.Up(DB, config.MigrationDir)
-	if err != nil {
-		return nil, fmt.Errorf("goose: failed to migrate DB: %v", err)
-	}
-
-	return &postgresStore{
-		store:  DB,
-		logger: logger,
-	}, nil
+	return &URLRepository{db: db, logger: logger}, nil
 }
 
 // Save saves a new URL record to the database.
 // If a URL record already exists, ErrConflict is returned.
-func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
+func (ur *URLRepository) Save(ctx context.Context, u *models.URL) error {
 	const q = `
 		INSERT INTO url
 			(id, short_url, original_url, user_id)
@@ -61,7 +48,7 @@ func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
 	`
 
 	// query the database to insert the URL record
-	_, err := pg.store.ExecContext(ctx, q, u.ID, u.ShortURL, u.OriginalURL, u.UserID)
+	_, err := ur.db.ExecContext(ctx, q, u.ID, u.ShortURL, u.OriginalURL, u.UserID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -83,7 +70,7 @@ func (pg *postgresStore) Save(ctx context.Context, u *models.URL) error {
 
 // SaveAll saves multiple URL records to the database in a single transaction.
 // If a URL record already exists, the record is not inserted.
-func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error {
+func (ur *URLRepository) SaveAll(ctx context.Context, urls []*models.URL) error {
 	const q = `
         INSERT INTO url 
             (id, short_url, original_url, user_id)
@@ -91,14 +78,14 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
             ($1, $2, $3, $4)
     `
 
-	tx, err := pg.store.BeginTx(ctx, nil)
+	tx, err := ur.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() {
 		if err = tx.Rollback(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("rollback: %v", err)
+				ur.logger.Errorf("rollback: %v", err)
 			}
 		}
 	}()
@@ -110,7 +97,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 	defer func() {
 		if err = stmt.Close(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("close prepared statement: %v", err)
+				ur.logger.Errorf("close prepared statement: %v", err)
 			}
 		}
 	}()
@@ -139,7 +126,7 @@ func (pg *postgresStore) SaveAll(ctx context.Context, urls []*models.URL) error 
 
 // Get retrieves a URL record from the database based on its short URL.
 // If the URL record does not exist, ErrURLNotFound is returned.
-func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
+func (ur *URLRepository) Get(ctx context.Context, sURL models.ShortURL) (*models.URL, error) {
 	const q = `
 		SELECT
 			id, short_url, original_url, is_deleted
@@ -150,7 +137,7 @@ func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models
 	`
 
 	u := new(models.URL)
-	err := pg.store.QueryRowContext(ctx, q, sURL).Scan(
+	err := ur.db.QueryRowContext(ctx, q, sURL).Scan(
 		&u.ID,
 		&u.ShortURL,
 		&u.OriginalURL,
@@ -177,7 +164,7 @@ func (pg *postgresStore) Get(ctx context.Context, sURL models.ShortURL) (*models
 // GetAllByUserID retrieves all URL records from the database associated with a specific user.
 // It returns a slice of URL pointers and an error if any occurred.
 // If no URL records are found for the given user, it returns nil and ErrNotFound.
-func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
+func (ur *URLRepository) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
 	const q = `
         SELECT
             short_url, original_url
@@ -188,7 +175,7 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
     `
 
 	// Execute the query with the given userID.
-	rows, err := pg.store.QueryContext(ctx, q, userID)
+	rows, err := ur.db.QueryContext(ctx, q, userID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -203,7 +190,7 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 	// Close the rows when the function returns.
 	defer func() {
 		if err = rows.Close(); err != nil {
-			pg.logger.Errorf("close rows: %v", err)
+			ur.logger.Errorf("close rows: %v", err)
 		}
 	}()
 
@@ -241,21 +228,21 @@ func (pg *postgresStore) GetAllByUserID(ctx context.Context, userID string) ([]*
 // It takes a context and a slice of URL pointers as parameters.
 // It returns an error if any occurs during the deletion process.
 // If no URLs are provided, it returns nil.
-func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
+func (ur *URLRepository) DeleteURLs(ctx context.Context, urls ...*models.URL) error {
 	if len(urls) == 0 {
 		return nil
 	}
 
 	const q = "UPDATE url SET is_deleted = TRUE WHERE short_url = $1;"
 
-	tx, err := pg.store.BeginTx(ctx, nil)
+	tx, err := ur.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() {
 		if err = tx.Rollback(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("rollback: %v", err)
+				ur.logger.Errorf("rollback: %v", err)
 			}
 		}
 	}()
@@ -267,7 +254,7 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	defer func() {
 		if err = stmt.Close(); err != nil {
 			if errors.Is(err, sql.ErrTxDone) {
-				pg.logger.Errorf("close prepared statement: %v", err)
+				ur.logger.Errorf("close prepared statement: %v", err)
 			}
 		}
 	}()
@@ -290,8 +277,8 @@ func (pg *postgresStore) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 }
 
 // Ping verifies the connection to the database is alive.
-func (pg *postgresStore) Ping(ctx context.Context) error {
-	return pg.store.PingContext(ctx)
+func (ur *URLRepository) Ping(ctx context.Context) error {
+	return ur.db.PingContext(ctx)
 }
 
 // formatQuery removes tabs and replaces newlines with spaces in the given query string.

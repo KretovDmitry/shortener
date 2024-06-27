@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/jwt"
 	"github.com/KretovDmitry/shortener/internal/models"
@@ -22,9 +21,9 @@ type (
 	}
 
 	shortenJSONResponsePayload struct {
-		Result  models.ShortURL `json:"result"`
-		Message string          `json:"message"`
-		Success bool            `json:"success"`
+		Result  string `json:"result"`
+		Message string `json:"message"`
+		Success bool   `json:"success"`
 	}
 )
 
@@ -43,7 +42,7 @@ type (
 //	HTTP/1.1 201 Created
 //	Content-Type: application/json
 //	{
-//		"result": "http://config.AddrToReturn/Base58{8}"
+//		"result": "http://config.AddrToReturn/Base58"
 //		"success": true
 //		"message": "OK"
 //	}
@@ -86,11 +85,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate short URL
-	generatedShortURL, err := shorturl.Generate(payload.URL)
-	if err != nil {
-		h.shortenJSONError(w, "failed to shorten url", err, http.StatusInternalServerError)
-		return
-	}
+	shortURL := shorturl.Generate(payload.URL)
 
 	user, ok := user.FromContext(r.Context())
 	if !ok {
@@ -98,10 +93,11 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newRecord := models.NewRecord(generatedShortURL, payload.URL, user.ID)
+	newRecord := models.NewRecord(shortURL, payload.URL, user.ID)
 
 	// Build the JWT authentication token.
-	authToken, err := jwt.BuildJWTString(user.ID, config.Secret, time.Duration(config.JWT))
+	authToken, err := jwt.BuildJWTString(user.ID,
+		h.config.JWT.SigningKey, h.config.JWT.Expiration)
 	if err != nil {
 		h.shortenJSONError(w, "failed to build JWT token", err, http.StatusInternalServerError)
 		return
@@ -127,15 +123,16 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "Authorization",
 		Value:    authToken,
-		Expires:  time.Now().Add(time.Duration(config.JWT)),
+		Expires:  time.Now().Add(h.config.JWT.Expiration),
 		HttpOnly: true,
 	})
 
 	// create response payload
-	result := shortenJSONResponsePayload{Result: models.ShortURL(generatedShortURL), Success: true, Message: "OK"}
+	s := fmt.Sprintf("http://%s/%s", h.config.HTTPServer.ReturnAddress, shortURL)
+	result := shortenJSONResponsePayload{Result: s, Success: true, Message: "OK"}
 
 	// encode response body
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err = json.NewEncoder(w).Encode(result); err != nil {
 		h.logger.Errorf("failed to encode response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -146,7 +143,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 // headers and status code for errors returned by the ShortenJSON endpoint.
 func (h *Handler) shortenJSONError(w http.ResponseWriter, message string, err error, code int) {
 	logger := h.logger.SkipCaller(1)
-	if code >= 500 {
+	if code >= http.StatusInternalServerError {
 		logger.Errorf("%s: %s", message, err)
 	} else {
 		logger.Infof("%s: %s", message, err)

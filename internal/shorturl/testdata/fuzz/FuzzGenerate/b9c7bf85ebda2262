@@ -1,0 +1,2 @@
+go test fuzz v1
+string("httpsMM.MMMM//v\xc2\xc2o.deg")

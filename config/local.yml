@@ -1,0 +1,19 @@
+http_server:
+  server_address: "0.0.0.0:8080"
+  return_address: "0.0.0.0:8080"
+  timeout: "5s"
+  idle_timeout: "60s"
+  shutdown_timeout: "30s"
+logger:
+  log_path: "/var/log/shortener/app.log"
+  level: "debug"
+  max_size_mb: 5
+  max_backups: 10
+  max_age_days: 14
+jwt:
+  signing_key: "LxsKJywDL5O5PvgODZhBH12KE6k2yL8E"
+  expiration: "24h"
+file_storage_path: "./short-url-db.json"
+migrations_path: "."
+delete_buffer_length: 5
+enable_https: false

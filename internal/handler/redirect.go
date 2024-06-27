@@ -12,7 +12,7 @@ import (
 
 // Base58Regexp is a regular expression that matches a valid Base58-encoded string.
 // It is used to validate the format of shortened URLs.
-var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]{8}$`)
+var Base58Regexp = regexp.MustCompile(`^[A-HJ-NP-Za-km-z1-9]+$`)
 
 // GetRedirect serves a redirect to the original URL based on the shortened URL.
 //

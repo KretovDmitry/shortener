@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -14,11 +15,16 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
-	_ "github.com/KretovDmitry/shortener/migrations"
+	"github.com/KretovDmitry/shortener/internal/repository"
+	"github.com/KretovDmitry/shortener/internal/repository/filestore"
+	"github.com/KretovDmitry/shortener/internal/repository/postgres"
+	"github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	sqldblogger "github.com/simukti/sqldb-logger"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -39,27 +45,81 @@ func run() error {
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 	defer serverStopCtx()
 
-	logger := logger.Get()
+	// Load application configurations.
+	cfg := config.MustLoad()
 
-	err := config.ParseFlags()
-	if err != nil {
-		return fmt.Errorf("parse flags: %w", err)
+	// Create root logger tagged with server version.
+	logger := logger.New(cfg).With(serverCtx, "version", buildVersion)
+	defer func() {
+		_ = logger.Sync()
+	}()
+
+	// Single store used by the app. Could be in memory, file storage or
+	// postgres based on configuration.
+	var store repository.URLStorage
+
+	switch cfg.DSN {
+	default:
+		// Connect to the postgres.
+		db, err := sql.Open("pgx", cfg.DSN)
+		if err != nil {
+			return fmt.Errorf("failed to open the database: %w", err)
+		}
+
+		// Log every query to the database.
+		db = sqldblogger.OpenDriver(cfg.DSN, db.Driver(), logger)
+
+		// Check connectivity and DSN correctness.
+		if err = db.Ping(); err != nil {
+			return fmt.Errorf("failed to connect to the database: %w", err)
+		}
+
+		// Close connection.
+		defer func() {
+			if err = db.Close(); err != nil {
+				logger.Error(err)
+			}
+		}()
+
+		// Up all migrations for github tests.
+		err = migrations.Up(db)
+		if err != nil {
+			return fmt.Errorf("failed to migrate DB: %w", err)
+		}
+
+		// Init postgres URL repository.
+		store, err = postgres.NewURLRepository(db, logger)
+		if err != nil {
+			return fmt.Errorf("new postgres repository: %w", err)
+		}
+	case "":
+		logger.Info("DSN is not provided, initializing file storage")
+		// Init file URL repository.
+		var err error
+		store, err = filestore.NewFileStore(cfg)
+		if err != nil {
+			return fmt.Errorf("new file repository: %w", err)
+		}
+		if cfg.FileStoragePath != "" {
+			logger.Infof("file storage initialaized at: %q",
+				cfg.FileStoragePath)
+		}
 	}
 
-	store, err := db.NewStore(serverCtx, logger)
-	if err != nil {
-		return fmt.Errorf("new store: %w", err)
-	}
-
-	handler, err := handler.New(store, logger, 5)
+	// Init HTTP handlers.
+	handler, err := handler.New(store, cfg, logger)
 	if err != nil {
 		return fmt.Errorf("new handler: %w", err)
 	}
+	// Stop async short URL deletion.
 	defer handler.Stop()
 
+	// Init HTTP server.
 	hs := &http.Server{
-		Addr:    config.AddrToRun.String(),
-		Handler: handler.Register(chi.NewRouter(), logger),
+		Addr:              cfg.HTTPServer.RunAddress.String(),
+		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
+		Handler:           handler.Register(chi.NewRouter(), cfg, logger),
 	}
 
 	// Graceful shutdown.
@@ -72,7 +132,7 @@ func run() error {
 
 		logger.With(serverCtx, "signal", signal.String()).
 			Infof("Shutting down server with %s timeout",
-				config.ShutdownTimeout)
+				cfg.HTTPServer.ShutdownTimeout)
 
 		if err = hs.Shutdown(serverCtx); err != nil {
 			logger.Errorf("graceful shutdown failed: %s", err)
@@ -80,17 +140,32 @@ func run() error {
 		serverStopCtx()
 	}()
 
-	logger.Infof("Server has started: %s", config.AddrToRun)
-	logger.Infof("Return address: %s", config.AddrToReturn)
-	if err = hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("run server failed: %w", err)
+	logger.Infof("Server has started: %s", cfg.HTTPServer.RunAddress)
+	logger.Infof("Return address: %s", cfg.HTTPServer.ReturnAddress)
+	switch cfg.TLSEnabled {
+	case true:
+		cm := &autocert.Manager{
+			Cache:  autocert.DirCache("cache/certs"),
+			Prompt: autocert.AcceptTOS,
+		}
+		hs.TLSConfig = cm.TLSConfig()
+		logger.Info("The server is running over the SSL protocol")
+		if err = hs.ListenAndServeTLS("", ""); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("run server failed: %w", err)
+		}
+	default:
+		if err = hs.ListenAndServe(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("run server failed: %w", err)
+		}
 	}
 
 	// Wait for server context to be stopped
 	select {
 	case <-serverCtx.Done():
-	case <-time.After(config.ShutdownTimeout):
-		return errors.New("graceful shutdown timed out.. forcing exit")
+	case <-time.After(cfg.HTTPServer.ShutdownTimeout):
+		return errors.New("graceful shutdown timed out... forcing exit")
 	}
 
 	return nil

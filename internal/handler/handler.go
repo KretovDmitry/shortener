@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,13 +10,14 @@ import (
 	"time"
 
 	"github.com/KretovDmitry/shortener/internal/config"
-	"github.com/KretovDmitry/shortener/internal/db"
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/middleware"
 	"github.com/KretovDmitry/shortener/internal/models"
+	"github.com/KretovDmitry/shortener/internal/repository"
 	"github.com/KretovDmitry/shortener/pkg/accesslog"
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/nanmu42/gzip"
 	"go.uber.org/zap"
 )
@@ -23,7 +25,9 @@ import (
 // Handler struct represents the main handler for the application.
 type Handler struct {
 	// store is the database URL storage.
-	store db.URLStorage
+	store repository.URLStorage
+	// application configuration.
+	config *config.Config
 	// logger is the application logger.
 	logger logger.Logger
 	// deleteURLsChan is a channel for sending deleted URLs to be flushed from the database.
@@ -37,21 +41,32 @@ type Handler struct {
 }
 
 // New constructs a new handler, ensuring that the dependencies are valid values.
-func New(store db.URLStorage, logger logger.Logger, bufLen int) (*Handler, error) {
+func New(
+	store repository.URLStorage,
+	config *config.Config,
+	logger logger.Logger,
+) (*Handler, error) {
 	if store == nil {
-		return nil, fmt.Errorf("%w: nil store", errs.ErrNilDependency)
+		return nil, fmt.Errorf("%w: store", errs.ErrNilDependency)
+	}
+	if config == nil {
+		return nil, fmt.Errorf("%w: config", errs.ErrNilDependency)
 	}
 	if logger == nil {
-		return nil, fmt.Errorf("%w: nil logger", errs.ErrNilDependency)
+		return nil, fmt.Errorf("%w: logger", errs.ErrNilDependency)
+	}
+	if config.DeleteBufLen <= 0 {
+		return nil, errors.New("buffer length should be >= 1")
 	}
 
 	h := &Handler{
 		store:          store,
+		config:         config,
 		logger:         logger,
 		deleteURLsChan: make(chan *models.URL),
 		wg:             &sync.WaitGroup{},
 		done:           make(chan struct{}),
-		bufLen:         bufLen,
+		bufLen:         config.DeleteBufLen,
 	}
 
 	h.wg.Add(1)
@@ -79,7 +94,7 @@ func (h *Handler) Stop() {
 	}()
 
 	select {
-	case <-time.After(config.ShutdownTimeout):
+	case <-time.After(h.config.HTTPServer.ShutdownTimeout):
 		h.logger.Error("handler stop: shutdown timeout exceeded")
 	case <-ready:
 		return
@@ -87,11 +102,12 @@ func (h *Handler) Stop() {
 }
 
 // Register sets up the routes for the HTTP server.
-func (h *Handler) Register(r chi.Router, logger logger.Logger) chi.Router {
+func (h *Handler) Register(r chi.Router, config *config.Config, logger logger.Logger) chi.Router {
 	r.Use(accesslog.Handler(logger))
 	r.Use(gzip.DefaultHandler().WrapHandler)
-	r.Use(middleware.Unzip)
-	r.Use(middleware.Authorization)
+	r.Use(middleware.Unzip(logger))
+	r.Use(middleware.Authorization(config, logger))
+	r.Use(chimiddleware.Recoverer)
 
 	r.Post("/", h.PostShortenText)
 	r.Post("/api/shorten", h.PostShortenJSON)
@@ -103,7 +119,7 @@ func (h *Handler) Register(r chi.Router, logger logger.Logger) chi.Router {
 	r.Delete("/api/user/urls", h.DeleteURLs)
 
 	r.Route("/api/user", func(r chi.Router) {
-		r.Use(middleware.OnlyWithToken)
+		r.Use(middleware.OnlyWithToken(config, logger))
 		r.Get("/urls", h.GetAllByUserID)
 	})
 
@@ -164,7 +180,7 @@ func (h *Handler) flush(URLs ...*models.URL) error {
 // textError writes error response to the response writer in a text/plain format.
 func (h *Handler) textError(w http.ResponseWriter, message string, err error, code int) {
 	logger := h.logger.SkipCaller(1)
-	if code >= 500 {
+	if code >= http.StatusInternalServerError {
 		logger.Errorf("%s: %s", message, err)
 	} else {
 		logger.Infof("%s: %s", message, err)
@@ -187,7 +203,7 @@ func (h *Handler) IsApplicationJSONContentType(r *http.Request) bool {
 
 // IsTextPlainContentType returns true if the content type of the
 // HTTP request is text/plain.
-func (h *Handler) IsTextPlainContentType(r *http.Request) bool {
+func isTextPlainContentType(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
 	if i := strings.Index(contentType, ";"); i > -1 {

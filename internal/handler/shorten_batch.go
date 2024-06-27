@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/KretovDmitry/shortener/internal/errs"
@@ -52,11 +53,11 @@ type (
 //
 //		{
 //			"correlation_id": "42b4cb1b-abf0-44e7-89f9-72ad3a277e0a",
-//			"short_url": "http://config.AddrToReturn/Base58{8}"
+//			"short_url": "http://config.AddrToReturn/Base58"
 //		},
 //		{
 //			"correlation_id": "229d9603-8540-4925-83f6-5cb1f239a72b",
-//			"short_url": "http://config.AddrToReturn/Base58{8}"
+//			"short_url": "http://config.AddrToReturn/Base58"
 //		},
 //		...
 //	 ]
@@ -97,7 +98,6 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, p := range payload {
-
 		// check if URL is provided
 		if len(p.OriginalURL) == 0 {
 			h.textError(w, "URL is not provided", errs.ErrInvalidRequest, http.StatusBadRequest)
@@ -111,13 +111,9 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// generate short URL
-		shortURL, err := shorturl.Generate(p.OriginalURL)
-		if err != nil {
-			h.textError(w, "failed to shorten url", err, http.StatusInternalServerError)
-			return
-		}
-
+		shortURL := shorturl.Generate(p.OriginalURL)
 		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, user.ID)
+		shortURL = fmt.Sprintf("http://%s/%s", h.config.HTTPServer.ReturnAddress, shortURL)
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}
 

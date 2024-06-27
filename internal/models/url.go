@@ -2,10 +2,6 @@
 package models
 
 import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/google/uuid"
 )
 
@@ -23,17 +19,11 @@ type OriginalURL string
 //   - UserID: the ID of the user who created the URL record.
 //   - IsDeleted: a boolean flag that indicates whether the URL record has been deleted.
 type URL struct {
-	ID          string      `json:"id,omitempty"`
+	ID          string      `json:"id"`
 	ShortURL    ShortURL    `json:"short_url"`
 	OriginalURL OriginalURL `json:"original_url"`
-	UserID      string      `json:"user_id,omitempty"`
-	IsDeleted   bool        `db:"is_deleted"`
-}
-
-// MarshalJSON is a method that implements the json.Marshaler interface.
-func (s ShortURL) MarshalJSON() ([]byte, error) {
-	result := fmt.Sprintf("http://%s/%s", config.AddrToReturn, s)
-	return json.Marshal(result)
+	UserID      string      `json:"user_id"`
+	IsDeleted   bool        `json:"is_deleted" db:"is_deleted"`
 }
 
 // NewRecord is a function that creates a new URL record.

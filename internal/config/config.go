@@ -27,6 +27,7 @@ const (
 	defaultMaxLogBackups          = 10
 	defaultMaxLogFileLifetimeDays = 14
 	defaultMigtationsPath         = "."
+	defaultDeleteBufLen           = 5
 )
 
 // Default variables.
@@ -88,7 +89,7 @@ type (
 	}
 )
 
-// Flag Value interface implementation guards.
+// Interface implementation guards.
 var (
 	_ flag.Value      = (*NetAddress)(nil)
 	_ cleanenv.Setter = (*NetAddress)(nil)
@@ -194,7 +195,7 @@ func MustLoad() *Config {
 	cfg.Logger.MaxBackups = defaultMaxLogBackups
 	cfg.Logger.MaxAgeDays = defaultMaxLogFileLifetimeDays
 	cfg.Migrations = defaultMigtationsPath
-	cfg.DeleteBufLen = 5
+	cfg.DeleteBufLen = defaultDeleteBufLen
 
 	// Configuration file path.
 	configPath, set := os.LookupEnv("CONFIG")
@@ -261,6 +262,6 @@ func NewForTest() *Config {
 			SigningKey: "test",
 			Expiration: 10 * time.Minute,
 		},
-		DeleteBufLen: 5,
+		DeleteBufLen: defaultDeleteBufLen,
 	}
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -18,12 +17,8 @@ import (
 	"github.com/KretovDmitry/shortener/internal/handler"
 	"github.com/KretovDmitry/shortener/internal/logger"
 	"github.com/KretovDmitry/shortener/internal/repository"
-	"github.com/KretovDmitry/shortener/internal/repository/filestore"
-	"github.com/KretovDmitry/shortener/internal/repository/postgres"
-	"github.com/KretovDmitry/shortener/migrations"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	sqldblogger "github.com/simukti/sqldb-logger"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -45,7 +40,7 @@ func run() error {
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 	defer serverStopCtx()
 
-	// Load application configurations.
+	// Load application configuration.
 	cfg := config.MustLoad()
 
 	// Create root logger tagged with server version.
@@ -54,56 +49,10 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
-	// Single store used by the app. Could be in memory, file storage or
-	// postgres based on configuration.
-	var store repository.URLStorage
-
-	switch cfg.DSN {
-	default:
-		// Connect to the postgres.
-		db, err := sql.Open("pgx", cfg.DSN)
-		if err != nil {
-			return fmt.Errorf("failed to open the database: %w", err)
-		}
-
-		// Log every query to the database.
-		db = sqldblogger.OpenDriver(cfg.DSN, db.Driver(), logger)
-
-		// Check connectivity and DSN correctness.
-		if err = db.Ping(); err != nil {
-			return fmt.Errorf("failed to connect to the database: %w", err)
-		}
-
-		// Close connection.
-		defer func() {
-			if err = db.Close(); err != nil {
-				logger.Error(err)
-			}
-		}()
-
-		// Up all migrations for github tests.
-		err = migrations.Up(db)
-		if err != nil {
-			return fmt.Errorf("failed to migrate DB: %w", err)
-		}
-
-		// Init postgres URL repository.
-		store, err = postgres.NewURLRepository(db, logger)
-		if err != nil {
-			return fmt.Errorf("new postgres repository: %w", err)
-		}
-	case "":
-		logger.Info("DSN is not provided, initializing file storage")
-		// Init file URL repository.
-		var err error
-		store, err = filestore.NewFileStore(cfg)
-		if err != nil {
-			return fmt.Errorf("new file repository: %w", err)
-		}
-		if cfg.FileStoragePath != "" {
-			logger.Infof("file storage initialaized at: %q",
-				cfg.FileStoragePath)
-		}
+	// Init URL repository.
+	store, err := repository.NewURLStore(cfg, logger)
+	if err != nil {
+		return fmt.Errorf("failed to init store: %w", err)
 	}
 
 	// Init HTTP handlers.
@@ -142,8 +91,7 @@ func run() error {
 
 	logger.Infof("Server has started: %s", cfg.HTTPServer.RunAddress)
 	logger.Infof("Return address: %s", cfg.HTTPServer.ReturnAddress)
-	switch cfg.TLSEnabled {
-	case true:
+	if cfg.TLSEnabled {
 		cm := &autocert.Manager{
 			Cache:  autocert.DirCache("cache/certs"),
 			Prompt: autocert.AcceptTOS,
@@ -154,7 +102,7 @@ func run() error {
 			!errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("run server failed: %w", err)
 		}
-	default:
+	} else {
 		if err = hs.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("run server failed: %w", err)

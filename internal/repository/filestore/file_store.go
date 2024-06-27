@@ -111,7 +111,7 @@ func NewFileStore(config *config.Config) (*FileStore, error) {
 				return nil, fmt.Errorf("save record: %w", err)
 			}
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

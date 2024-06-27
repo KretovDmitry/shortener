@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // URLRepository implements URLStorage interface.
@@ -22,17 +21,12 @@ type URLRepository struct {
 	logger logger.Logger
 }
 
-// NewPostgresStore creates a new Postgres database connection pool
-// and initializes the database schema.
-func NewURLRepository(
-	db *sql.DB,
-	logger logger.Logger,
+// NewPostgresStore creates a new URLStorage implementation based on Postgres.
+func NewURLRepository(db *sql.DB, logger logger.Logger,
 ) (*URLRepository, error) {
+	// Check for dependencies that can lead to panic.
 	if db == nil {
 		return nil, fmt.Errorf("%w: *sql.DB", errs.ErrNilDependency)
-	}
-	if logger == nil {
-		return nil, fmt.Errorf("%w: logger", errs.ErrNilDependency)
 	}
 	return &URLRepository{db: db, logger: logger}, nil
 }
@@ -72,11 +66,11 @@ func (ur *URLRepository) Save(ctx context.Context, u *models.URL) error {
 // If a URL record already exists, the record is not inserted.
 func (ur *URLRepository) SaveAll(ctx context.Context, urls []*models.URL) error {
 	const q = `
-        INSERT INTO url 
-            (id, short_url, original_url, user_id)
-        VALUES
-            ($1, $2, $3, $4)
-    `
+		INSERT INTO url 
+			(id, short_url, original_url, user_id)
+		VALUES
+			($1, $2, $3, $4)
+	`
 
 	tx, err := ur.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -84,7 +78,7 @@ func (ur *URLRepository) SaveAll(ctx context.Context, urls []*models.URL) error 
 	}
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			if errors.Is(err, sql.ErrTxDone) {
+			if !errors.Is(err, sql.ErrTxDone) {
 				ur.logger.Errorf("rollback: %v", err)
 			}
 		}
@@ -96,14 +90,14 @@ func (ur *URLRepository) SaveAll(ctx context.Context, urls []*models.URL) error 
 	}
 	defer func() {
 		if err = stmt.Close(); err != nil {
-			if errors.Is(err, sql.ErrTxDone) {
+			if !errors.Is(err, sql.ErrTxDone) {
 				ur.logger.Errorf("close prepared statement: %v", err)
 			}
 		}
 	}()
 
 	for _, url := range urls {
-		_, err := stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL, url.UserID)
+		_, err = stmt.ExecContext(ctx, url.ID, url.ShortURL, url.OriginalURL, url.UserID)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
@@ -144,7 +138,7 @@ func (ur *URLRepository) Get(ctx context.Context, sURL models.ShortURL) (*models
 		&u.IsDeleted,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errs.ErrNotFound
 		}
 		var pgErr *pgconn.PgError
@@ -166,13 +160,13 @@ func (ur *URLRepository) Get(ctx context.Context, sURL models.ShortURL) (*models
 // If no URL records are found for the given user, it returns nil and ErrNotFound.
 func (ur *URLRepository) GetAllByUserID(ctx context.Context, userID string) ([]*models.URL, error) {
 	const q = `
-        SELECT
-            short_url, original_url
-        FROM
-            url
-        WHERE
-            user_id = $1
-    `
+		SELECT
+			short_url, original_url
+		FROM
+			url
+		WHERE
+			user_id = $1
+	`
 
 	// Execute the query with the given userID.
 	rows, err := ur.db.QueryContext(ctx, q, userID)
@@ -241,7 +235,7 @@ func (ur *URLRepository) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	}
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			if errors.Is(err, sql.ErrTxDone) {
+			if !errors.Is(err, sql.ErrTxDone) {
 				ur.logger.Errorf("rollback: %v", err)
 			}
 		}
@@ -253,14 +247,14 @@ func (ur *URLRepository) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	}
 	defer func() {
 		if err = stmt.Close(); err != nil {
-			if errors.Is(err, sql.ErrTxDone) {
+			if !errors.Is(err, sql.ErrTxDone) {
 				ur.logger.Errorf("close prepared statement: %v", err)
 			}
 		}
 	}()
 
 	for _, url := range urls {
-		_, err := stmt.ExecContext(ctx, url.ShortURL)
+		_, err = stmt.ExecContext(ctx, url.ShortURL)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {

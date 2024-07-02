@@ -46,14 +46,8 @@ func New(
 	config *config.Config,
 	logger logger.Logger,
 ) (*Handler, error) {
-	if store == nil {
-		return nil, fmt.Errorf("%w: store", errs.ErrNilDependency)
-	}
 	if config == nil {
 		return nil, fmt.Errorf("%w: config", errs.ErrNilDependency)
-	}
-	if logger == nil {
-		return nil, fmt.Errorf("%w: logger", errs.ErrNilDependency)
 	}
 	if config.DeleteBufLen <= 0 {
 		return nil, errors.New("buffer length should be >= 1")

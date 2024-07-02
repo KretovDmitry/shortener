@@ -7,10 +7,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/errs"
 	"github.com/KretovDmitry/shortener/internal/models"
-	"github.com/KretovDmitry/shortener/internal/repository"
 )
-
-var _ repository.URLStorage = (*URLRepository)(nil)
 
 // URLRepository is an in-memory implementation of the URLStorage interface.
 // It stores URLs in a map and provides methods to interact with the stored data.
@@ -49,6 +46,7 @@ func (r *URLRepository) GetAllByUserID(_ context.Context, userID string) ([]*mod
 
 	all := make([]*models.URL, 0)
 	for _, record := range r.store {
+		record := record // for Go versions below 1.22
 		if record.UserID == userID {
 			all = append(all, &record)
 		}

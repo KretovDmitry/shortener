@@ -87,14 +87,6 @@ func TestNew(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{
-			name: "negative test #1: nil store",
-			args: args{
-				store: nil,
-			},
-			want:    nil,
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

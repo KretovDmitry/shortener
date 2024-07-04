@@ -270,6 +270,35 @@ func (ur *URLRepository) DeleteURLs(ctx context.Context, urls ...*models.URL) er
 	return tx.Commit()
 }
 
+// CountUsers returns total users count.
+func (ur *URLRepository) CountUsers(ctx context.Context) (int, error) {
+	const q = "SELECT COUNT(DISTINCT user_id) FROM url;"
+
+	res := -1
+
+	err := ur.db.QueryRowContext(ctx, q).Scan(&res)
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
+// CountShortURLs returns total number of all shortened urls.
+func (ur *URLRepository) CountShortURLs(ctx context.Context) (int, error) {
+	// short_url column has unique index.
+	const q = "SELECT COUNT(*) FROM url;"
+
+	res := -1
+
+	err := ur.db.QueryRowContext(ctx, q).Scan(&res)
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
 // Ping verifies the connection to the database is alive.
 func (ur *URLRepository) Ping(ctx context.Context) error {
 	return ur.db.PingContext(ctx)

@@ -117,6 +117,11 @@ func (h *Handler) Register(r chi.Router, config *config.Config, logger logger.Lo
 		r.Get("/urls", h.GetAllByUserID)
 	})
 
+	r.Route("/api/internal", func(r chi.Router) {
+		r.Use(middleware.OnlyTrustedSubnet(config, logger))
+		r.Get("/stats", h.GetStats)
+	})
+
 	return r
 }
 

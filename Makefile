@@ -81,7 +81,7 @@ mock: ## generate all mocks for the project with mockgen
 
 .PHONY: mock-store
 mock-store: ## generate mock store with mockgen
-	mockgen -destination=mocks/mock_store.go -package=mocks github.com/KretovDmitry/shortener/internal/db URLStorage
+	mockgen -destination=mocks/mock_store.go -package=mocks github.com/KretovDmitry/shortener/internal/repository URLStorage
 
 .PHONY: yp-statictest
 yp-statictest: ## run Yandex Practicum static analysis tool

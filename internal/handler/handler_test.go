@@ -55,6 +55,14 @@ func (s *brokenStore) Ping(context.Context) error {
 	return errIntentionallyNotWorkingMethod
 }
 
+func (s *brokenStore) CountUsers(context.Context) (int, error) {
+	return 0, errIntentionallyNotWorkingMethod
+}
+
+func (s *brokenStore) CountShortURLs(context.Context) (int, error) {
+	return 0, errIntentionallyNotWorkingMethod
+}
+
 type brokenReader struct{}
 
 func (br *brokenReader) Read(_ []byte) (int, error) {

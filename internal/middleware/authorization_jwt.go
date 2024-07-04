@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/KretovDmitry/shortener/internal/config"
@@ -10,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
+
+const realIPHeader = "X-Real-IP"
 
 // Authorization is a middleware function that checks for an "Authorization" cookie
 // and extracts the user ID from the JWT token. If the user ID is found, it adds
@@ -75,6 +78,33 @@ func Authorization(config *config.Config, logger logger.Logger) func(next http.H
 			ctx := user.NewContext(r.Context(), &user.User{ID: id})
 
 			next.ServeHTTP(w, r.WithContext(ctx))
+		}
+
+		return http.HandlerFunc(f)
+	}
+}
+
+// OnlyTrustedSubnet rejects all untrusted IP addresses.
+func OnlyTrustedSubnet(config *config.Config, logger logger.Logger) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		f := func(w http.ResponseWriter, r *http.Request) {
+			ipStr := r.Header.Get(realIPHeader)
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				logger.Errorf(
+					"invalid nginx configuration: invalid %q: %q",
+					realIPHeader, ipStr)
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
+			if !config.TrustedSubnet.Contains(ip) {
+				logger.Infof("untrusted IP address has been accessed: %q", ip)
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
 		}
 
 		return http.HandlerFunc(f)

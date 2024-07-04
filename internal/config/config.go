@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -55,6 +56,8 @@ type (
 		TLSEnabled TLSEnabled `yaml:"enable_https" env:"ENABLE_HTTPS"`
 		// Length of the buffer for asynchronous deletion.
 		DeleteBufLen int `yaml:"delete_buffer_length"`
+		// Classless Inter-Domain Routing (CIDR).
+		TrustedSubnet *Subnet `yaml:"trusted_subnet" env:"TRUSTED_SUBNET"`
 	}
 	// Config for HTTP server.
 	HTTPServer struct {
@@ -93,6 +96,8 @@ type (
 var (
 	_ flag.Value      = (*NetAddress)(nil)
 	_ cleanenv.Setter = (*NetAddress)(nil)
+	_ flag.Value      = (*Subnet)(nil)
+	_ cleanenv.Setter = (*Subnet)(nil)
 )
 
 // NetAddress represents a network address with a host and a port.
@@ -137,6 +142,48 @@ func (a *NetAddress) Set(s string) error {
 // SetValue implements cleanenv value setter.
 func (a *NetAddress) SetValue(s string) error {
 	return a.Set(s)
+}
+
+// Subnet represents an IP network.
+type Subnet net.IPNet
+
+// NewSubnet constructs zero valued Subnet pointer.
+func NewSubnet() *Subnet {
+	return &Subnet{}
+}
+
+// Contains validates ability of a client to rich resource.
+func (sn *Subnet) Contains(ip net.IP) bool {
+	// infer to avoid infinitive recursive call.
+	return (*net.IPNet)(sn).Contains(ip)
+}
+
+// String returns string representation of the IP network.
+func (sn *Subnet) String() string {
+	// infer to avoid infinitive recursive call.
+	return (*net.IPNet)(sn).String()
+}
+
+// Set parses CIDR and sets network.
+func (sn *Subnet) Set(s string) error {
+	// in case of empty trusted subnet leave the Subnet value set to zero
+	// to ensure that the call [*net.IPNet.Contains(IP) bool]
+	// will not return true to any IP address.
+	if len(s) == 0 {
+		return nil
+	}
+	// validate and set CIDR.
+	_, ipNet, err := net.ParseCIDR(s)
+	if err != nil {
+		return err
+	}
+	*sn = Subnet(*ipNet)
+	return nil
+}
+
+// SetValue implements cleanenv value setter.
+func (sn *Subnet) SetValue(s string) error {
+	return sn.Set(s)
 }
 
 // TLSEnabled determines whether the server will be started in the TLS mode.
@@ -189,6 +236,7 @@ func MustLoad() *Config {
 	// Setup default values.
 	cfg.HTTPServer.RunAddress = NewNetAddress()
 	cfg.HTTPServer.ReturnAddress = NewNetAddress()
+	cfg.TrustedSubnet = NewSubnet()
 	cfg.FileStoragePath = defaultFileStoragePath
 	cfg.Logger.Path = defaultLogPath
 	cfg.Logger.MaxSizeMB = defaultMaxLogSizeMB
@@ -231,6 +279,7 @@ func MustLoad() *Config {
 	// Read given flags. If not provided use file values.
 	flag.Var(cfg.HTTPServer.RunAddress, "a", "server start address in form host:port")
 	flag.Var(cfg.HTTPServer.ReturnAddress, "b", "server return address in form host:port")
+	flag.Var(cfg.TrustedSubnet, "t", "trusted subnet (CIDR)")
 	flag.Var(&cfg.TLSEnabled, "s", "run the server in TLS mode")
 	flag.StringVar(&cfg.FileStoragePath, "f", cfg.FileStoragePath, "file storage path")
 	flag.StringVar(&cfg.DSN, "d", cfg.DSN, "server data source name")

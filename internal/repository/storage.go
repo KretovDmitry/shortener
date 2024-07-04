@@ -33,6 +33,12 @@ type URLStorage interface {
 	// DeleteURLs deletes one or more URLs from the storage.
 	DeleteURLs(ctx context.Context, urls ...*models.URL) error
 
+	// CountUsers returns total users count.
+	CountUsers(context.Context) (int, error)
+
+	// CountShortURLs returns total number of all shortened urls.
+	CountShortURLs(context.Context) (int, error)
+
 	// Ping checks the health of the storage.
 	Ping(ctx context.Context) error
 }

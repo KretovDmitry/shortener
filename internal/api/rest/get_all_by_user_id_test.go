@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func TestGetAllByUserID_Method(t *testing.T) {
 			l, _ := logger.NewForTest()
 			c := config.NewForTest()
 
-			handler, err := New(memstore.NewURLRepository(), c, l)
+			handler, err := NewHandler(memstore.NewURLRepository(), c, l)
 			require.NoError(t, err, "new handler error")
 
 			handler.GetAllByUserID(w, r)
@@ -73,7 +73,7 @@ func TestGetAllByUserID_WithoutUserInContext(t *testing.T) {
 	l, _ := logger.NewForTest()
 	c := config.NewForTest()
 
-	handler, err := New(memstore.NewURLRepository(), c, l)
+	handler, err := NewHandler(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -101,7 +101,7 @@ func TestGetAllByUserID_NoData(t *testing.T) {
 	l, _ := logger.NewForTest()
 	c := config.NewForTest()
 
-	handler, err := New(memstore.NewURLRepository(), c, l)
+	handler, err := NewHandler(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)
@@ -149,7 +149,7 @@ func TestGetAllByUserID_Data(t *testing.T) {
 	l, _ := logger.NewForTest()
 	c := config.NewForTest()
 
-	handler, err := New(mocks, c, l)
+	handler, err := NewHandler(mocks, c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.GetAllByUserID(w, r)

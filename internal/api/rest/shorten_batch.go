@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"encoding/json"
@@ -113,7 +113,7 @@ func (h *Handler) PostShortenBatch(w http.ResponseWriter, r *http.Request) {
 		// generate short URL
 		shortURL := shorturl.Generate(p.OriginalURL)
 		recordsToSave[i] = models.NewRecord(shortURL, p.OriginalURL, user.ID)
-		shortURL = fmt.Sprintf("http://%s/%s", h.config.HTTPServer.ReturnAddress, shortURL)
+		shortURL = fmt.Sprintf("http://%s/%s", h.config.Server.ReturnAddress, shortURL)
 		result[i] = shortenBatchResponsePayload{p.CorrelationID, models.ShortURL(shortURL)}
 	}
 

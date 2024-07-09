@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ func Example() {
 	// Init handler.
 	config := config.NewForTest()
 	logger := logger.New(config)
-	h, _ := New(memstore.NewURLRepository(), config, logger)
+	h, _ := NewHandler(memstore.NewURLRepository(), config, logger)
 
 	// Prepare request and recorder.
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://go.dev/"))

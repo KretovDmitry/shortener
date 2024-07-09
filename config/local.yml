@@ -16,4 +16,5 @@ jwt:
 file_storage_path: "./short-url-db.json"
 migrations_path: "."
 delete_buffer_length: 5
-enable_https: false
+enable_https: "true"
+enable_rpc: true

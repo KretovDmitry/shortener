@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"encoding/json"
@@ -68,7 +68,7 @@ func (h *Handler) GetAllByUserID(w http.ResponseWriter, r *http.Request) {
 	response := make([]getAllByUserIDResponsePayload, len(URLs))
 	for i, u := range URLs {
 		su := fmt.Sprintf("http://%s/%s",
-			h.config.HTTPServer.ReturnAddress, u.ShortURL)
+			h.config.Server.ReturnAddress, u.ShortURL)
 		response[i].ShortURL = models.ShortURL(su)
 		response[i].OriginalURL = u.OriginalURL
 	}

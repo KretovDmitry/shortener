@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"context"
@@ -75,7 +75,7 @@ func TestGetPingDB(t *testing.T) {
 			l, _ := logger.NewForTest()
 			c := config.NewForTest()
 
-			handler, err := New(tt.store, c, l)
+			handler, err := NewHandler(tt.store, c, l)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.GetPingDB(w, r)
@@ -116,7 +116,7 @@ func TestGetPing_Method(t *testing.T) {
 			l, _ := logger.NewForTest()
 			c := config.NewForTest()
 
-			handler, err := New(memstore.NewURLRepository(), c, l)
+			handler, err := NewHandler(memstore.NewURLRepository(), c, l)
 			require.NoError(t, err, "failed to init new handler")
 
 			handler.GetPingDB(w, r)

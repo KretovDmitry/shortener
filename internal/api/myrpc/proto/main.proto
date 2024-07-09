@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "internal/api/myrpc/proto";
+
+message ShortenURLIn {
+  string original_url = 1;
+}
+message ShortenURLOut {
+  string short_url = 1;
+}
+
+message ShortenBatchIn {
+  message ShortenBatchItemIn {
+    string correlation_id = 1;
+    string original_url = 2;
+  }
+  repeated ShortenBatchItemIn items = 1;
+}
+message ShortenBatchOut {
+  message ShortenBatchItemOut {
+    string correlation_id = 1;
+    string short_url = 2;
+  }
+  repeated ShortenBatchItemOut items = 1;
+}
+
+message DeleteURLsIn {
+  repeated string urls = 1;
+}
+message DeleteURLsOut {}
+
+message GetURLsIn {}
+message GetURLsOut {
+  message GetURLsOutItem {
+    string short_url = 1;
+    string original_url = 2;
+  }
+  repeated GetURLsOutItem items = 1;
+}
+
+message RedirectIn {
+  string short_url = 1;
+}
+message RedirectOut {
+  string location = 1;
+}
+
+message PingIn {}
+message PingOut{}
+
+message GetStatsIn {}
+message GetStatsOut {
+  sint64 urls = 1;
+  sint64 users = 2;
+}
+
+service Shortener {
+  rpc ShortenURL(ShortenURLIn) returns (ShortenURLOut);
+  rpc ShortenBatch(ShortenBatchIn) returns (ShortenBatchOut);
+  rpc DeleteURLs(DeleteURLsIn) returns (DeleteURLsOut);
+  rpc GetURLs(GetURLsIn) returns (GetURLsOut);
+  rpc Redirect(RedirectIn) returns (RedirectOut);
+  rpc Ping(PingIn) returns (PingOut);
+}

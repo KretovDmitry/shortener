@@ -238,3 +238,9 @@ yp-test-iter18: ## run test for iter18 [sudo]
 	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration18$$ \
 		-source-path=.
 
+.PHONY: proto
+proto: ## generate from proto files
+	 protoc --go_out=. --go_opt=paths=import \
+	 --go-grpc_out=. --go-grpc_opt=paths=import \
+	 ./internal/api/myrpc/proto/main.proto
+

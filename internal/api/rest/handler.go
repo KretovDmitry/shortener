@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"context"
@@ -40,8 +40,8 @@ type Handler struct {
 	bufLen int
 }
 
-// New constructs a new handler, ensuring that the dependencies are valid values.
-func New(
+// NewHandler constructs a new handler, ensuring that the dependencies are valid values.
+func NewHandler(
 	store repository.URLStorage,
 	config *config.Config,
 	logger logger.Logger,
@@ -88,7 +88,7 @@ func (h *Handler) Stop() {
 	}()
 
 	select {
-	case <-time.After(h.config.HTTPServer.ShutdownTimeout):
+	case <-time.After(h.config.Server.ShutdownTimeout):
 		h.logger.Error("handler stop: shutdown timeout exceeded")
 	case <-ready:
 		return
@@ -100,7 +100,7 @@ func (h *Handler) Register(r chi.Router, config *config.Config, logger logger.Lo
 	r.Use(accesslog.Handler(logger))
 	r.Use(gzip.DefaultHandler().WrapHandler)
 	r.Use(middleware.Unzip(logger))
-	r.Use(middleware.Authorization(config, logger))
+	r.Use(middleware.AuthorizationHTTP(config, logger))
 	r.Use(chimiddleware.Recoverer)
 
 	r.Post("/", h.PostShortenText)
@@ -113,12 +113,12 @@ func (h *Handler) Register(r chi.Router, config *config.Config, logger logger.Lo
 	r.Delete("/api/user/urls", h.DeleteURLs)
 
 	r.Route("/api/user", func(r chi.Router) {
-		r.Use(middleware.OnlyWithToken(config, logger))
+		r.Use(middleware.OnlyWithTokenHTTP(config, logger))
 		r.Get("/urls", h.GetAllByUserID)
 	})
 
 	r.Route("/api/internal", func(r chi.Router) {
-		r.Use(middleware.OnlyTrustedSubnet(config, logger))
+		r.Use(middleware.OnlyTrustedSubnetHTTP(config, logger))
 		r.Get("/stats", h.GetStats)
 	})
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/KretovDmitry/shortener/internal/config"
 	"github.com/google/uuid"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	sqldblogger "github.com/simukti/sqldb-logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -49,6 +50,10 @@ type Logger interface {
 	// SkipCaller allows skip wrappers in the call stack to log actual
 	// caller location.
 	SkipCaller(depth int) *Log
+
+	// InterceptorLogger adapts logger to interceptor logger.
+	// LevelWarn treated as LevelError.
+	InterceptorLogger() logging.Logger
 }
 
 // Log is a zap sugared logger wrraper with additional functionality.
@@ -198,6 +203,27 @@ func (l *Log) With(ctx context.Context, args ...interface{}) Logger {
 		return &Log{l.SugaredLogger.With(args...)}
 	}
 	return l
+}
+
+// InterceptorLogger adapts logger to interceptor logger.
+// LevelWarn treated as LevelError.
+func (l *Log) InterceptorLogger() logging.Logger {
+	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...any) {
+		largs := append([]any{"msg", msg}, fields...)
+		l = l.SkipCaller(1)
+		switch lvl {
+		case logging.LevelDebug:
+			l.Debug(largs...)
+		case logging.LevelInfo:
+			l.Info(largs...)
+		case logging.LevelWarn:
+			l.Error(largs...)
+		case logging.LevelError:
+			l.Error(largs...)
+		default:
+			l.Errorf("unknown level %v", lvl)
+		}
+	})
 }
 
 // WithRequest returns a context which knows

@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"encoding/json"
@@ -128,7 +128,7 @@ func (h *Handler) PostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// create response payload
-	s := fmt.Sprintf("http://%s/%s", h.config.HTTPServer.ReturnAddress, shortURL)
+	s := fmt.Sprintf("http://%s/%s", h.config.Server.ReturnAddress, shortURL)
 	result := shortenJSONResponsePayload{Result: s, Success: true, Message: "OK"}
 
 	// encode response body

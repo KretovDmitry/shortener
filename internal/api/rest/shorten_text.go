@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"errors"
@@ -104,7 +104,7 @@ func (h *Handler) PostShortenText(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Write the response body.
-	_, err = fmt.Fprintf(w, "http://%s/%s", h.config.HTTPServer.ReturnAddress, generatedShortURL)
+	_, err = fmt.Fprintf(w, "http://%s/%s", h.config.Server.ReturnAddress, generatedShortURL)
 	if err != nil {
 		h.logger.Errorf("failed to write response: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

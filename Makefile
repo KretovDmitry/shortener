@@ -81,7 +81,7 @@ mock: ## generate all mocks for the project with mockgen
 
 .PHONY: mock-store
 mock-store: ## generate mock store with mockgen
-	mockgen -destination=mocks/mock_store.go -package=mocks github.com/KretovDmitry/shortener/internal/db URLStorage
+	mockgen -destination=mocks/mock_store.go -package=mocks github.com/KretovDmitry/shortener/internal/repository URLStorage
 
 .PHONY: yp-statictest
 yp-statictest: ## run Yandex Practicum static analysis tool
@@ -237,4 +237,10 @@ yp-test-iter18: ## run test for iter18 [sudo]
 	@echo "------------- Running TestIteration18 -------------"
 	@sudo ./shortenertestbeta -test.v -test.run=^TestIteration18$$ \
 		-source-path=.
+
+.PHONY: proto
+proto: ## generate from proto files
+	 protoc --go_out=. --go_opt=paths=import \
+	 --go-grpc_out=. --go-grpc_opt=paths=import \
+	 ./internal/api/myrpc/proto/main.proto
 

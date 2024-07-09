@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"encoding/json"
@@ -196,7 +196,7 @@ func TestPostShortenJSON(t *testing.T) {
 			l, _ := logger.NewForTest()
 			c := config.NewForTest()
 
-			handler, err := New(tt.store, c, l)
+			handler, err := NewHandler(tt.store, c, l)
 			require.NoError(t, err, "new handler context error")
 
 			handler.PostShortenJSON(w, r)
@@ -231,7 +231,7 @@ func TestShortenJSON_WithoutUserInContext(t *testing.T) {
 	l, _ := logger.NewForTest()
 	c := config.NewForTest()
 
-	handler, err := New(memstore.NewURLRepository(), c, l)
+	handler, err := NewHandler(memstore.NewURLRepository(), c, l)
 	require.NoError(t, err, "new handler error")
 
 	handler.PostShortenJSON(w, r)

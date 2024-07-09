@@ -195,6 +195,16 @@ func (fs *FileStore) SaveAll(ctx context.Context, urls []*models.URL) error {
 	return nil
 }
 
+// CountUsers returns total users count.
+func (fs *FileStore) CountUsers(ctx context.Context) (int, error) {
+	return fs.cache.CountUsers(ctx)
+}
+
+// CountShortURLs returns total number of all shortened urls.
+func (fs *FileStore) CountShortURLs(ctx context.Context) (int, error) {
+	return fs.cache.CountShortURLs(ctx)
+}
+
 // Ping is a placeholder method that returns an error
 // indicating that the database is not connected [ErrDBNotConnected].
 func (fs *FileStore) Ping(context.Context) error {

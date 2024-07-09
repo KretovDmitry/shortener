@@ -113,3 +113,22 @@ func (r *URLRepository) SaveAll(_ context.Context, u []*models.URL) error {
 func (r *URLRepository) Ping(_ context.Context) error {
 	return errs.ErrDBNotConnected
 }
+
+// CountUsers returns total users count.
+func (r *URLRepository) CountUsers(context.Context) (int, error) {
+	m := make(map[string]struct{})
+	r.mu.RLock()
+	for _, u := range r.store {
+		m[u.UserID] = struct{}{}
+	}
+	r.mu.RUnlock()
+	return len(m), nil
+}
+
+// CountShortURLs returns total number of all shortened urls.
+func (r *URLRepository) CountShortURLs(context.Context) (int, error) {
+	r.mu.RLock()
+	res := len(r.store)
+	r.mu.RUnlock()
+	return res, nil
+}

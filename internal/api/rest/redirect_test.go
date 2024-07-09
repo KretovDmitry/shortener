@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"context"
@@ -160,7 +160,7 @@ func TestGetRedirect(t *testing.T) {
 			l, _ := logger.NewForTest()
 			c := config.NewForTest()
 
-			handler, err := New(tt.store, c, l)
+			handler, err := NewHandler(tt.store, c, l)
 			require.NoError(t, err, "new handler context error")
 
 			// call the handler

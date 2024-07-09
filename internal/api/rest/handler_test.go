@@ -1,4 +1,4 @@
-package handler
+package rest
 
 import (
 	"context"
@@ -55,6 +55,14 @@ func (s *brokenStore) Ping(context.Context) error {
 	return errIntentionallyNotWorkingMethod
 }
 
+func (s *brokenStore) CountUsers(context.Context) (int, error) {
+	return 0, errIntentionallyNotWorkingMethod
+}
+
+func (s *brokenStore) CountShortURLs(context.Context) (int, error) {
+	return 0, errIntentionallyNotWorkingMethod
+}
+
 type brokenReader struct{}
 
 func (br *brokenReader) Read(_ []byte) (int, error) {
@@ -91,7 +99,7 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l, _ := logger.NewForTest()
-			got, err := New(tt.args.store, config.NewForTest(), l)
+			got, err := NewHandler(tt.args.store, config.NewForTest(), l)
 			if !assert.Equal(t, tt.wantErr, err != nil) {
 				t.Errorf("Error message: %s\n", err)
 			}
